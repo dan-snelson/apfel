@@ -9,6 +9,12 @@ import Foundation
 /// HTTP client that talks to the apfel server's OpenAI-compatible API.
 /// This is the ONLY file that makes network requests. Pure URLSession.
 final class APIClient: Sendable {
+    struct StreamError: LocalizedError {
+        let message: String
+
+        var errorDescription: String? { message }
+    }
+
     let baseURL: URL
 
     init(port: Int) {
@@ -126,10 +132,17 @@ final class APIClient: Sendable {
                             let prettyChunk = Self.prettyFormatInline(json)
                             rawLines.append("data: \(prettyChunk)")
 
-                            if let data = json.data(using: .utf8),
-                               let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
-                               let content = chunk.choices.first?.delta.content {
-                                continuation.yield(content)
+                            if let data = json.data(using: .utf8) {
+                                if let errorChunk = try? JSONDecoder().decode(StreamErrorChunk.self, from: data) {
+                                    APIClient.lastRawSSEResponse = rawLines.joined(separator: "\n\n")
+                                    continuation.finish(throwing: StreamError(message: Self.userFacingErrorMessage(errorChunk.error)))
+                                    return
+                                }
+
+                                if let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
+                                   let content = chunk.choices.first?.delta.content {
+                                    continuation.yield(content)
+                                }
                             }
                         }
                     }
@@ -155,6 +168,10 @@ final class APIClient: Sendable {
         }
     }
 
+    private struct StreamErrorChunk: Decodable {
+        let error: String
+    }
+
     // MARK: - Logs
 
     struct LogEntry: Decodable, Identifiable {
@@ -167,6 +184,9 @@ final class APIClient: Sendable {
         let stream: Bool
         let estimated_tokens: Int?
         let error: String?
+        let request_body: String?
+        let response_body: String?
+        let events: [String]?
     }
 
     struct LogListResponse: Decodable {
@@ -232,6 +252,19 @@ final class APIClient: Sendable {
               let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]),
               let str = String(data: pretty, encoding: .utf8) else { return raw }
         return str
+    }
+
+    static func userFacingErrorMessage(_ raw: String) -> String {
+        let lowered = raw.lowercased()
+        if lowered.contains("unsafe") || lowered.contains("safety") {
+            return "The model blocked this response for safety reasons. Try rephrasing the prompt."
+        }
+        return raw
+    }
+
+    static func isSafetyError(_ raw: String) -> Bool {
+        let lowered = raw.lowercased()
+        return lowered.contains("unsafe") || lowered.contains("safety")
     }
 
     private func prettyFormatJSON(_ raw: String) -> String {

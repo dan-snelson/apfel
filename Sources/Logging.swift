@@ -20,6 +20,7 @@ struct RequestLog: Codable, Sendable {
     let error: String?
     let request_body: String?   // only populated in --debug mode
     let response_body: String?  // only populated in --debug mode
+    let events: [String]?
 }
 
 // MARK: - Log Store
@@ -60,6 +61,11 @@ actor LogStore {
         let errorLabel = log.error.map { " error=\"\($0)\"" } ?? ""
         let line = "[\(log.timestamp)] \(log.method) \(log.path) \(log.status) \(log.duration_ms)ms\(streamLabel)\(tokenLabel)\(errorLabel)"
         printStderr(line)
+        if let events = log.events {
+            for event in events {
+                printStderr("  \(styled("•", .dim)) \(event)")
+            }
+        }
     }
 
     /// Increment active request counter.
@@ -120,6 +126,12 @@ actor LogStore {
             max_concurrent: maxConcurrent
         )
     }
+}
+
+func truncateForLog(_ value: String, limit: Int = 4000) -> String {
+    if value.count <= limit { return value }
+    let end = value.index(value.startIndex, offsetBy: limit)
+    return String(value[..<end]) + "\n...[truncated]"
 }
 
 // MARK: - Log Stats Response

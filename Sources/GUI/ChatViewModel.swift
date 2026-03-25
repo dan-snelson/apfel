@@ -18,6 +18,7 @@ struct ChatMsg: Identifiable {
     var durationMs: Int?
     var tokenCount: Int?
     var isStreaming: Bool = false
+    var includeInHistory: Bool = true
 }
 
 /// Observable state for the chat interface.
@@ -57,7 +58,7 @@ class ChatViewModel {
         guard !input.isEmpty, !isStreaming else { return }
 
         // Build message history (before adding this message)
-        var history = messages.filter { $0.role == "user" || $0.role == "assistant" }
+        var history = messages.filter { ($0.role == "user" || $0.role == "assistant") && $0.includeInHistory }
             .map { (role: $0.role, content: $0.content) }
         history.append((role: "user", content: input))
 
@@ -107,11 +108,20 @@ class ChatViewModel {
 
             let durationMs = Int(Date().timeIntervalSince(start) * 1000)
             let rawResponse = APIClient.lastRawSSEResponse
+            let assistantContent = messages.first(where: { $0.id == assistantId })?.content.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             updateMessage(id: assistantId) { msg in
                 msg.isStreaming = false
                 msg.durationMs = durationMs
                 msg.tokenCount = max(1, msg.content.count / 4)
                 msg.responseJSON = rawResponse
+            }
+            if shouldExcludeTurnFromHistory(assistantContent) {
+                updateMessage(id: userId) { $0.includeInHistory = false }
+                updateMessage(id: assistantId) { $0.includeInHistory = false }
+                if assistantContent.isEmpty {
+                    updateMessage(id: assistantId) { $0.content = "Error: Empty response from model." }
+                    errorMessage = "Empty response from model."
+                }
             }
 
             // Auto-follow: select the latest assistant message in debug panel
@@ -127,7 +137,9 @@ class ChatViewModel {
             updateMessage(id: assistantId) { msg in
                 msg.content = "Error: \(error.localizedDescription)"
                 msg.isStreaming = false
+                msg.includeInHistory = false
             }
+            updateMessage(id: userId) { $0.includeInHistory = false }
             errorMessage = error.localizedDescription
         }
 
@@ -158,17 +170,39 @@ class ChatViewModel {
         return "\"\(escaped)\""
     }
 
+    private func shouldExcludeTurnFromHistory(_ assistantContent: String) -> Bool {
+        let lowered = assistantContent.lowercased()
+        if assistantContent.isEmpty { return true }
+        let refusalPatterns = [
+            "can't assist with that request",
+            "cannot assist with that request",
+            "can't help with that request",
+            "cannot help with that request",
+            "i'm sorry, but i can't assist",
+            "i'm sorry, but i cannot assist",
+            "unsafe",
+            "safety reasons",
+            "error:"
+        ]
+        return refusalPatterns.contains { lowered.contains($0) }
+    }
+
     // MARK: - Voice Input
 
     func toggleListening() {
         if stt.isListening {
+            errorMessage = nil
             let transcript = stt.stopListening()
             if !transcript.isEmpty {
                 currentInput += (currentInput.isEmpty ? "" : " ") + transcript
+                Task {
+                    await send()
+                }
             }
         } else {
             Task {
                 do {
+                    errorMessage = nil
                     let authorized = await stt.requestPermissions()
                     if authorized {
                         stt.startListening()

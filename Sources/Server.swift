@@ -64,7 +64,7 @@ func startServer(config: ServerConfig) async throws {
                 method: "POST", path: "/v1/chat/completions", status: 429,
                 duration_ms: Int(Date().timeIntervalSince(start) * 1000),
                 stream: false, estimated_tokens: nil,
-                error: "Too many concurrent requests", request_body: nil, response_body: nil
+                error: "Too many concurrent requests", request_body: nil, response_body: nil, events: ["semaphore timeout"]
             )
             await serverState.logStore.append(log)
             return openAIError(status: .tooManyRequests, message: "Server at max concurrent capacity (\(config.maxConcurrent)). Try again later.", type: "rate_limit_error")
@@ -77,7 +77,7 @@ func startServer(config: ServerConfig) async throws {
         }
 
         // Handle the request
-        let response = try await handleChatCompletion(request, context: context)
+        let result = try await handleChatCompletion(request, context: context)
 
         // Log it
         let durationMs = Int(Date().timeIntervalSince(start) * 1000)
@@ -85,14 +85,18 @@ func startServer(config: ServerConfig) async throws {
             id: requestId,
             timestamp: ISO8601DateFormatter().string(from: start),
             method: "POST", path: "/v1/chat/completions",
-            status: response.status == .ok ? 200 : response.status.code,
+            status: result.response.status == .ok ? 200 : result.response.status.code,
             duration_ms: durationMs,
-            stream: false, estimated_tokens: nil, error: nil,
-            request_body: nil, response_body: nil
+            stream: result.trace.stream,
+            estimated_tokens: result.trace.estimatedTokens,
+            error: result.trace.error,
+            request_body: result.trace.requestBody,
+            response_body: result.trace.responseBody,
+            events: result.trace.events
         )
         await serverState.logStore.append(log)
 
-        return response
+        return result.response
     }
 
     // Logs query

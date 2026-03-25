@@ -13,6 +13,15 @@ enum FocusField {
 struct ChatView: View {
     @Bindable var viewModel: ChatViewModel
     @FocusState private var focusedField: FocusField?
+    private var visibleErrorMessage: String? {
+        if let message = viewModel.stt.errorMessage, !message.isEmpty {
+            return message
+        }
+        if let message = viewModel.errorMessage, !message.isEmpty {
+            return message
+        }
+        return nil
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,6 +77,28 @@ struct ChatView: View {
 
             Divider()
 
+            if let errorMessage = visibleErrorMessage {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.yellow)
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.primary)
+                    if viewModel.stt.shouldOfferOpenSettings {
+                        Button("Open System Settings") {
+                            viewModel.stt.openSystemSettings()
+                        }
+                        .font(.caption)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(nsColor: .controlBackgroundColor))
+
+                Divider()
+            }
+
             // Input bar
             HStack(alignment: .center, spacing: 8) {
                 // Speaker toggle
@@ -82,10 +113,22 @@ struct ChatView: View {
 
                 // Microphone button
                 Button(action: { viewModel.toggleListening() }) {
-                    Image(systemName: viewModel.stt.isListening ? "mic.circle.fill" : "mic")
-                        .font(.body)
-                        .foregroundColor(viewModel.stt.isListening ? .red : .gray)
-                        .symbolEffect(.pulse, isActive: viewModel.stt.isListening)
+                    if viewModel.stt.isListening {
+                        Label("Stop", systemImage: "stop.circle.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.red)
+                            .clipShape(Capsule())
+                    } else {
+                        Image(systemName: "mic.fill")
+                            .font(.body)
+                            .foregroundColor(.gray)
+                            .frame(width: 30, height: 30)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .clipShape(Circle())
+                    }
                 }
                 .buttonStyle(.borderless)
                 .help(viewModel.stt.isListening ? "Stop listening" : "Start voice input")

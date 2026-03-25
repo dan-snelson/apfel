@@ -10,6 +10,7 @@ struct LogViewer: View {
     @State private var logs: [APIClient.LogEntry] = []
     @State private var errorsOnly = false
     @State private var isPolling = true
+    @State private var expandedLogIDs: Set<String> = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,43 +75,93 @@ struct LogViewer: View {
     }
 
     private func logRow(_ log: APIClient.LogEntry) -> some View {
-        HStack(spacing: 8) {
-            // Timestamp
-            Text(formatTimestamp(log.timestamp))
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.tertiary)
-                .frame(width: 70, alignment: .leading)
-
-            // Method + Path
-            Text("\(log.method) \(log.path)")
-                .font(.system(.caption, design: .monospaced))
-                .lineLimit(1)
-
-            Spacer()
-
-            // Status
-            Text("\(log.status)")
-                .font(.system(.caption, design: .monospaced))
-                .fontWeight(.semibold)
-                .foregroundStyle(log.status >= 400 ? .red : .green)
-
-            // Duration
-            Text("\(log.duration_ms)ms")
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 50, alignment: .trailing)
-
-            // Tokens
-            if let tokens = log.estimated_tokens {
-                Text("~\(tokens)t")
+        let isExpanded = expandedLogIDs.contains(log.id)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(formatTimestamp(log.timestamp))
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
-                    .frame(width: 40, alignment: .trailing)
+                    .frame(width: 70, alignment: .leading)
+
+                Text("\(log.method) \(log.path)")
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(1)
+
+                Spacer()
+
+                if log.stream {
+                    Text("SSE")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.orange)
+                }
+
+                Text("\(log.status)")
+                    .font(.system(.caption, design: .monospaced))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(log.status >= 400 ? .red : .green)
+
+                Text("\(log.duration_ms)ms")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 50, alignment: .trailing)
+
+                if let tokens = log.estimated_tokens {
+                    Text("~\(tokens)t")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 40, alignment: .trailing)
+                }
+            }
+
+            if let error = log.error, !error.isEmpty {
+                Text(error)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+            }
+
+            if isExpanded {
+                detailSection("Request", log.request_body)
+                detailSection("Response", log.response_body)
+                if let events = log.events, !events.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Events")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        ForEach(Array(events.enumerated()), id: \.offset) { _, event in
+                            Text(event)
+                                .font(.system(.caption2, design: .monospaced))
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 3)
+        .padding(.vertical, 6)
         .background(log.status >= 400 ? Color.red.opacity(0.05) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isExpanded {
+                expandedLogIDs.remove(log.id)
+            } else {
+                expandedLogIDs.insert(log.id)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func detailSection(_ title: String, _ content: String?) -> some View {
+        if let content, !content.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(content)
+                    .font(.system(.caption2, design: .monospaced))
+                    .textSelection(.enabled)
+            }
+        }
     }
 
     private func formatTimestamp(_ iso: String) -> String {

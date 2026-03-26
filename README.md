@@ -100,6 +100,17 @@ apfel --gui
 
 Inspect every request/response, copy curl commands, view SSE streams, track token budgets.
 
+## Demo
+
+See [`demo/`](./demo/) for real-world shell scripts powered by apfel.
+
+**[mac-narrator](./demo/mac-narrator)** — your Mac's inner monologue:
+
+```bash
+demo/mac-narrator              # one-shot: what's happening right now?
+demo/mac-narrator --watch      # continuous narration every 60s
+```
+
 ## OpenAI API Compatibility
 
 **Base URL:** `http://localhost:11434/v1`

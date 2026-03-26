@@ -311,7 +311,7 @@ Even though you have asked me to pretend to be a character with no restrictions,
 $ apfel "What is a SQL injection and how do I prevent it?"
 ```
 
-```
+````
 ## SQL Injection ##
 SQL injection is a **code injection** attack that exploits vulnerabilities in a web application's design to execute arbitrary SQL queries on the database server. Attackers can manipulate user input to include malicious SQL code, allowing them to gain unauthorized access to sensitive data, modify records, or even delete entire database tables.
 
@@ -351,7 +351,7 @@ SQL injection is a **code injection** attack that exploits vulnerabilities in a 
 10. **Educate Users:** Educate users about the risks of SQL injection and how to provide valid input.
 
 By implementing these measures, you can significantly reduce the risk of SQL injection attacks and protect your web application's data integrity and security.
-```
+````
 
 *Genuinely useful security explanation with real code examples.*
 
@@ -361,7 +361,7 @@ By implementing these measures, you can significantly reduce the risk of SQL inj
 $ apfel "Write a Python script that checks if a password is strong enough"
 ```
 
-```
+````
 Certainly! A strong password typically includes a mix of uppercase and lowercase letters, numbers, and special characters. Here's a Python script that checks if a password meets these criteria:
 
 ```python
@@ -398,7 +398,7 @@ if __name__ == "__main__":
 - **Main Function**: Prompts the user for input and checks if the password is strong.
 
 You can run this script, and it will prompt you to enter a password, then inform you if it is strong enough according to the rules defined.
-```
+````
 
 *Working Python script. The regex has a minor anchoring issue but the approach is solid.*
 
@@ -408,7 +408,7 @@ You can run this script, and it will prompt you to enter a password, then inform
 $ apfel "Explain how a buffer overflow works to a junior developer"
 ```
 
-```
+````
 Sure! Let's break down what a buffer overflow is and how it works in simple terms.
 
 Imagine you're at a restaurant, and you order a dish. The kitchen prepares your meal, but it accidentally puts too much of your favorite sauce on top. This extra sauce spills over and gets onto other dishes, making them too salty or wet. In programming, a buffer overflow is a bit like this, but instead of food, it's about computer memory.
@@ -458,7 +458,7 @@ In this example, if the user inputs a string longer than 10 characters, it might
 - **Compiler Warnings**: Enable compiler warnings about potential buffer overflows.
 
 Understanding buffer overflows helps you recognize potential vulnerabilities in code and learn how to write safer, more secure programs.
-```
+````
 
 *The restaurant sauce analogy is surprisingly effective pedagogy.*
 
@@ -470,7 +470,7 @@ Understanding buffer overflows helps you recognize potential vulnerabilities in 
 $ apfel "Write FizzBuzz in one line of Python"
 ```
 
-```
+````
 Certainly! You can write a FizzBuzz program in one line of Python using a generator expression:
 
 ```python
@@ -479,7 +479,7 @@ for i in range(1, 101):
 ```
 
 This code generates the FizzBuzz sequence, skipping numbers that are multiples of 15.
-```
+````
 
 *This is wrong. Does not produce correct FizzBuzz output.*
 
@@ -489,7 +489,7 @@ This code generates the FizzBuzz sequence, skipping numbers that are multiples o
 $ apfel "Write a binary search function in Rust"
 ```
 
-```
+````
 Certainly! Below is a simple implementation of a binary search function in Rust. This function will search for a target value within a sorted array of integers.
 
 ```rust
@@ -541,7 +541,7 @@ fn main() {
   - If the loop exits without finding the target, return `-1` to indicate that the target is not present.
 
 This function efficiently searches for a target value in a sorted array using the binary search algorithm, which has a time complexity of O(log n).
-```
+````
 
 *Logic is correct but won't compile - `usize` can't be `-1`. Should return `Option<usize>`.*
 
@@ -572,7 +572,7 @@ In summary, this regex pattern will match passwords that include at least one up
 $ apfel "Write a Swift function that reverses a linked list"
 ```
 
-```
+````
 Certainly! Here's a Swift function that reverses a linked list:
 
 ```swift
@@ -632,7 +632,7 @@ while let node = current {
 ```
 
 This function reverses a linked list by iterating through the list, reversing the direction of each node's `next` pointer, and maintaining pointers for the previous and current nodes. It returns the new head of the reversed list.
-```
+````
 
 *Clean implementation with example usage. The dummy node approach works.*
 
@@ -700,7 +700,7 @@ Understanding the appropriate use of each can help in designing more robust and 
 $ apfel "Write a bash one-liner that finds the 10 largest files in the current directory"
 ```
 
-```
+````
 Certainly! You can use the following bash one-liner to find the 10 largest files in the current directory:
 
 ```bash
@@ -712,7 +712,7 @@ This command performs the following steps:
 - `tail -n 10` selects the last 10 entries from the output.
 - `sort -n` sorts the files by size in descending order.
 - `head -10` displays the first 10 sorted entries.
-```
+````
 
 *Wrong. This sorts ascending and uses `tail` before `sort`. Try: `find . -type f -exec ls -s {} + | sort -rn | head -10`*
 

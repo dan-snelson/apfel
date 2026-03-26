@@ -58,12 +58,18 @@ GUI (SwiftUI) ─── HTTP ────┘   SchemaConverter → DynamicGenera
 ## Build & Test
 
 ```bash
-swift build                    # build
-swift run apfel-tests          # run 28 unit tests
-swift run apfel "Hello"        # single prompt
-swift run apfel --chat         # interactive chat
-swift run apfel --serve        # start server on :11434
-swift run apfel --model-info   # check model availability
+make install                   # build release + install to /usr/local/bin
+swift build                    # debug build only
+swift run apfel-tests          # run 32 unit tests
+apfel "Hello"                  # single prompt (after make install)
+apfel --serve                  # start server on :11434
+```
+
+**Always use `make install` for testing changes** - `swift run` uses a debug build, and the installed binary at `/usr/local/bin/apfel` won't reflect your changes until you run `make install`.
+
+Integration tests (requires server running):
+```bash
+python3 -m pytest Tests/integration/ -v    # 34 integration tests
 ```
 
 ## Key Files

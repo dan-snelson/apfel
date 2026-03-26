@@ -49,13 +49,13 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
                                  responseBody: msg, events: events + ["validation failed: empty messages"]))
     }
 
-    // Validate: last message must be user
-    guard chatRequest.messages.last?.role == "user" else {
-        let msg = "Last message must have role 'user'"
+    // Validate: last message must be user or tool (tool = standard tool-calling flow)
+    guard ["user", "tool"].contains(chatRequest.messages.last?.role) else {
+        let msg = "Last message must have role 'user' or 'tool'"
         return (openAIError(status: .badRequest, message: msg, type: "invalid_request_error"),
                 ChatRequestTrace(stream: chatRequest.stream == true, estimatedTokens: nil, error: msg,
                                  requestBody: truncateForLog(requestBodyString),
-                                 responseBody: msg, events: events + ["validation failed: last role != user"]))
+                                 responseBody: msg, events: events + ["validation failed: last role != user/tool"]))
     }
 
     // Reject image content (not supported by Apple's on-device model)

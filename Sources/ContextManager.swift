@@ -32,10 +32,22 @@ enum ContextManager {
         jsonMode: Bool = false
     ) async throws -> (session: LanguageModelSession, finalPrompt: String) {
         let conversation = messages.filter { $0.role != "system" }
-        guard let finalPrompt = conversation.last?.textContent, !finalPrompt.isEmpty else {
-            throw ApfelError.unknown("Last message has no text content")
+
+        // When last message is role:"tool", the model should respond using the tool result.
+        // We put all messages (including the tool result) into history and use a
+        // synthetic prompt asking the model to respond based on the tool output.
+        let finalPrompt: String
+        let history: [OpenAIMessage]
+        if conversation.last?.role == "tool" {
+            finalPrompt = "Respond to the user based on the tool result above."
+            history = conversation
+        } else {
+            guard let text = conversation.last?.textContent, !text.isEmpty else {
+                throw ApfelError.unknown("Last message has no text content")
+            }
+            finalPrompt = text
+            history = Array(conversation.dropLast())
         }
-        let history = Array(conversation.dropLast())
         let model = makeModel(permissive: options.permissive)
 
         // Convert tools: native ToolDefinitions + text fallback for failures

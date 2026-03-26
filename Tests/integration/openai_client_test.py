@@ -113,6 +113,27 @@ def test_tool_calling():
     assert resp.choices[0].message.tool_calls[0].function.name == "get_weather"
 
 
+def test_tool_round_trip_tool_last():
+    """Tool result as last message (no trailing user message) should work."""
+    resp = httpx.post(f"{BASE_URL.replace('/v1', '')}/v1/chat/completions",
+                      json={
+                          "model": MODEL,
+                          "messages": [
+                              {"role": "user", "content": "What is the weather in Vienna?"},
+                              {"role": "assistant", "content": None,
+                               "tool_calls": [{"id": "call_1", "type": "function",
+                                             "function": {"name": "get_weather",
+                                                         "arguments": "{\"city\": \"Vienna\"}"}}]},
+                              {"role": "tool", "tool_call_id": "call_1", "name": "get_weather",
+                               "content": "{\"temperature\": 22, \"condition\": \"sunny\"}"}
+                          ]
+                      }, timeout=60)
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+    data = resp.json()
+    assert data["choices"][0]["finish_reason"] == "stop"
+    assert data["choices"][0]["message"]["content"] is not None
+
+
 # MARK: - JSON Mode
 
 def test_json_mode():

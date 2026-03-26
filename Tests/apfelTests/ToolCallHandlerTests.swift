@@ -111,6 +111,42 @@ func runToolCallHandlerTests() {
         try assertTrue(result.contains("call_xyz"))
     }
 
+    // MARK: - Plain string arguments (TICKET-013)
+
+    test("handles arguments as plain string (not JSON)") {
+        // Model sometimes returns: "arguments": "desktop" instead of "arguments": "{\"path\":\"desktop\"}"
+        let response = #"{"tool_calls": [{"id": "c1", "type": "function", "function": {"name": "list_dir", "arguments": "desktop"}}]}"#
+        let result = ToolCallHandler.detectToolCall(in: response)
+        try assertNotNil(result)
+        try assertEqual(result!.first?.name, "list_dir")
+        // The plain string should be preserved as-is (caller handles mapping)
+        try assertEqual(result!.first?.argumentsString, "desktop")
+    }
+
+    test("handles arguments as JSON object (not string)") {
+        // Model sometimes returns: "arguments": {"city": "Vienna"} instead of string
+        let response = #"{"tool_calls": [{"id": "c1", "type": "function", "function": {"name": "fn", "arguments": {"city": "Vienna"}}}]}"#
+        let result = ToolCallHandler.detectToolCall(in: response)
+        try assertNotNil(result)
+        try assertEqual(result!.first?.name, "fn")
+        // Should be serialized to a JSON string
+        try assertTrue(result!.first!.argumentsString.contains("Vienna"))
+    }
+
+    test("handles empty arguments string") {
+        let response = #"{"tool_calls": [{"id": "c1", "type": "function", "function": {"name": "fn", "arguments": ""}}]}"#
+        let result = ToolCallHandler.detectToolCall(in: response)
+        try assertNotNil(result)
+        try assertEqual(result!.first?.argumentsString, "")
+    }
+
+    test("handles missing arguments field") {
+        let response = #"{"tool_calls": [{"id": "c1", "type": "function", "function": {"name": "fn"}}]}"#
+        let result = ToolCallHandler.detectToolCall(in: response)
+        try assertNotNil(result)
+        try assertEqual(result!.first?.argumentsString, "{}")
+    }
+
     // MARK: - Split prompt methods
 
     test("buildOutputFormatInstructions contains tool names") {

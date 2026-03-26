@@ -8,7 +8,7 @@ import Foundation
 
 // MARK: - Configuration
 
-let version = "0.3.0"
+let version = "0.4.0"
 let appName = "apfel"
 let modelName = "apple-foundationmodel"
 
@@ -63,6 +63,10 @@ var serverHost: String = "127.0.0.1"
 var serverCORS: Bool = false
 var serverMaxConcurrent: Int = 5
 var serverDebug: Bool = false
+var cliTemperature: Double? = nil
+var cliSeed: UInt64? = nil
+var cliMaxTokens: Int? = nil
+var cliPermissive: Bool = false
 
 var i = 0
 while i < args.count {
@@ -143,6 +147,36 @@ while i < args.count {
     case "--debug":
         serverDebug = true
 
+    case "--temperature":
+        i += 1
+        guard i < args.count, let t = Double(args[i]) else {
+            printError("--temperature requires a number (e.g., 0.7)")
+            exit(exitUsageError)
+        }
+        cliTemperature = t
+
+    case "--seed":
+        i += 1
+        guard i < args.count, let s = UInt64(args[i]) else {
+            printError("--seed requires a positive integer")
+            exit(exitUsageError)
+        }
+        cliSeed = s
+
+    case "--max-tokens":
+        i += 1
+        guard i < args.count, let n = Int(args[i]), n > 0 else {
+            printError("--max-tokens requires a positive number")
+            exit(exitUsageError)
+        }
+        cliMaxTokens = n
+
+    case "--permissive":
+        cliPermissive = true
+
+    case "--model-info":
+        mode = "model-info"
+
     default:
         if args[i].hasPrefix("-") {
             printError("unknown option: \(args[i])")
@@ -156,6 +190,13 @@ while i < args.count {
 }
 
 // MARK: - Dispatch
+
+let sessionOpts = SessionOptions(
+    temperature: cliTemperature,
+    maxTokens: cliMaxTokens,
+    seed: cliSeed,
+    permissive: cliPermissive
+)
 
 do {
     switch mode {
@@ -172,22 +213,25 @@ do {
         )
         try await startServer(config: config)
 
+    case "model-info":
+        await printModelInfo()
+
     case "chat":
-        try await chat(systemPrompt: systemPrompt)
+        try await chat(systemPrompt: systemPrompt, options: sessionOpts)
 
     case "stream":
         guard !prompt.isEmpty else {
             printError("no prompt provided")
             exit(exitUsageError)
         }
-        try await singlePrompt(prompt, systemPrompt: systemPrompt, stream: true)
+        try await singlePrompt(prompt, systemPrompt: systemPrompt, stream: true, options: sessionOpts)
 
     default:
         guard !prompt.isEmpty else {
             printError("no prompt provided")
             exit(exitUsageError)
         }
-        try await singlePrompt(prompt, systemPrompt: systemPrompt, stream: false)
+        try await singlePrompt(prompt, systemPrompt: systemPrompt, stream: false, options: sessionOpts)
     }
 } catch {
     printError(error.localizedDescription)

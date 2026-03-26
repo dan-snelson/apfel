@@ -87,10 +87,12 @@ func handleChatCompletion(_ request: Request, context: some RequestContext) asyn
     let session: LanguageModelSession
     let finalPrompt: String
     do {
+        let jsonMode = chatRequest.response_format?.type == "json_object"
         (session, finalPrompt) = try await ContextManager.makeSession(
             messages: chatRequest.messages,
             tools: chatRequest.tools,
-            options: sessionOpts
+            options: sessionOpts,
+            jsonMode: jsonMode
         )
     } catch {
         let classified = ApfelError.classify(error)

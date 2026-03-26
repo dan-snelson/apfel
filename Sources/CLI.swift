@@ -5,6 +5,7 @@
 
 import FoundationModels
 import Foundation
+import ApfelCore
 
 // MARK: - Chat Header
 
@@ -31,25 +32,26 @@ func printHeader() {
 /// Behavior depends on output format:
 /// - **plain**: Print response directly. If streaming, print tokens as they arrive.
 /// - **json**: Buffer the complete response, then emit a single JSON object.
-func singlePrompt(_ prompt: String, systemPrompt: String?, stream: Bool) async throws {
-    let session = makeSession(systemPrompt: systemPrompt)
+func singlePrompt(_ prompt: String, systemPrompt: String?, stream: Bool, options: SessionOptions = .defaults) async throws {
+    let session = makeSession(systemPrompt: systemPrompt, options: options)
+    let genOpts = makeGenerationOptions(options)
 
     switch outputFormat {
     case .plain:
         if stream {
-            let _ = try await collectStream(session, prompt: prompt, printDelta: true)
+            let _ = try await collectStream(session, prompt: prompt, printDelta: true, options: genOpts)
             print()
         } else {
-            let response = try await session.respond(to: prompt)
+            let response = try await session.respond(to: prompt, options: genOpts)
             print(response.content)
         }
 
     case .json:
         let content: String
         if stream {
-            content = try await collectStream(session, prompt: prompt, printDelta: false)
+            content = try await collectStream(session, prompt: prompt, printDelta: false, options: genOpts)
         } else {
-            let response = try await session.respond(to: prompt)
+            let response = try await session.respond(to: prompt, options: genOpts)
             content = response.content
         }
         let obj = ApfelResponse(
@@ -63,14 +65,16 @@ func singlePrompt(_ prompt: String, systemPrompt: String?, stream: Bool) async t
 
 // MARK: - Interactive Chat
 
-/// Run an interactive multi-turn chat session.
-func chat(systemPrompt: String?) async throws {
+/// Run an interactive multi-turn chat session with context window protection.
+func chat(systemPrompt: String?, options: SessionOptions = .defaults) async throws {
     guard isatty(STDIN_FILENO) != 0 else {
         printError("--chat requires an interactive terminal (stdin must be a TTY)")
         exit(exitUsageError)
     }
 
-    let session = makeSession(systemPrompt: systemPrompt)
+    let model = makeModel(permissive: options.permissive)
+    var session = makeSession(systemPrompt: systemPrompt, options: options)
+    let genOpts = makeGenerationOptions(options)
     var turn = 0
 
     printHeader()
@@ -122,18 +126,36 @@ func chat(systemPrompt: String?) async throws {
             fflush(stdout)
         }
 
-        switch outputFormat {
-        case .plain:
-            let _ = try await collectStream(session, prompt: trimmed, printDelta: true)
-            print("\n")
+        do {
+            switch outputFormat {
+            case .plain:
+                let _ = try await collectStream(session, prompt: trimmed, printDelta: true, options: genOpts)
+                print("\n")
 
-        case .json:
-            let content = try await collectStream(session, prompt: trimmed, printDelta: false)
-            print(jsonString(
-                ChatMessage(role: "assistant", content: content, model: modelName),
-                pretty: false
-            ))
-            fflush(stdout)
+            case .json:
+                let content = try await collectStream(session, prompt: trimmed, printDelta: false, options: genOpts)
+                print(jsonString(
+                    ChatMessage(role: "assistant", content: content, model: modelName),
+                    pretty: false
+                ))
+                fflush(stdout)
+            }
+
+            // Context window protection: check transcript size after each turn
+            let transcript = session.transcript
+            let tokenCount = await TokenCounter.shared.count(entries: Array(Array(transcript)))
+            let budget = await TokenCounter.shared.inputBudget(reservedForOutput: 512)
+            if tokenCount > budget {
+                // Truncate: keep instructions + newest turns that fit
+                let truncated = truncateTranscript(transcript, budget: budget)
+                session = LanguageModelSession(model: model, transcript: truncated)
+                if !quietMode && outputFormat == .plain {
+                    print(styled("  [context rotated — oldest messages trimmed]", .dim))
+                }
+            }
+        } catch {
+            let classified = ApfelError.classify(error)
+            printError("\(classified.cliLabel) \(classified.openAIMessage)")
         }
     }
 
@@ -145,6 +167,79 @@ func chat(systemPrompt: String?) async throws {
             print(bye)
         }
     }
+}
+
+// MARK: - Context Truncation
+
+/// Truncate a transcript to fit within the token budget.
+/// Keeps instructions + newest turns that fit.
+func truncateTranscript(_ transcript: Transcript, budget: Int) -> Transcript {
+    let entries = Array(Array(transcript))
+    guard !entries.isEmpty else { return transcript }
+
+    var kept: [Transcript.Entry] = []
+    var used = 0
+
+    // Always keep instructions (first entry if present)
+    if case .instructions = entries.first {
+        kept.append(entries.first!)
+        // Rough estimate for instructions
+        used += 200
+    }
+
+    // Walk remaining entries newest-first, keep what fits
+    let historyEntries = entries.dropFirst()
+    var reversedKept: [Transcript.Entry] = []
+    for entry in historyEntries.reversed() {
+        let estimate: Int
+        switch entry {
+        case .prompt(let p):
+            estimate = p.segments.reduce(0) { sum, seg in
+                if case .text(let t) = seg { return sum + max(1, t.content.count / 4) }
+                return sum + 10
+            }
+        case .response(let r):
+            estimate = r.segments.reduce(0) { sum, seg in
+                if case .text(let t) = seg { return sum + max(1, t.content.count / 4) }
+                return sum + 10
+            }
+        case .toolCalls(let tc):
+            estimate = tc.count * 20
+        case .toolOutput(let o):
+            estimate = o.segments.reduce(0) { sum, seg in
+                if case .text(let t) = seg { return sum + max(1, t.content.count / 4) }
+                return sum + 10
+            }
+        default:
+            estimate = 10
+        }
+        if used + estimate > budget { break }
+        used += estimate
+        reversedKept.insert(entry, at: 0)
+    }
+
+    kept.append(contentsOf: reversedKept)
+    return Transcript(entries: kept)
+}
+
+// MARK: - Model Info
+
+/// Print model information and exit.
+func printModelInfo() async {
+    let tc = TokenCounter.shared
+    let available = await tc.isAvailable
+    let contextSize = await tc.contextSize
+    let languages = await tc.supportedLanguages
+
+    print("""
+    \(styled("apfel", .cyan, .bold)) v\(version) — model info
+    \(styled("├", .dim)) model:      \(modelName)
+    \(styled("├", .dim)) on-device:  true (always)
+    \(styled("├", .dim)) available:  \(available ? styled("yes", .green) : styled("no", .red))
+    \(styled("├", .dim)) context:    \(contextSize) tokens
+    \(styled("├", .dim)) languages:  \(languages.joined(separator: ", "))
+    \(styled("└", .dim)) framework:  FoundationModels (macOS 26+)
+    """)
 }
 
 // MARK: - Usage
@@ -165,6 +260,11 @@ func printUsage() {
       -o, --output <format>   Output format: plain, json [default: plain]
       -q, --quiet             Suppress non-essential output
           --no-color           Disable colored output
+          --temperature <n>    Sampling temperature (e.g., 0.7)
+          --seed <n>           Random seed for reproducible output
+          --max-tokens <n>     Maximum response tokens
+          --permissive         Use permissive content guardrails
+          --model-info         Print model capabilities and exit
       -h, --help              Show this help
       -v, --version           Print version
 

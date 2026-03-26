@@ -110,4 +110,25 @@ func runToolCallHandlerTests() {
         let result = ToolCallHandler.formatToolResult(callId: "call_xyz", name: "fn", content: "ok")
         try assertTrue(result.contains("call_xyz"))
     }
+
+    // MARK: - Split prompt methods
+
+    test("buildOutputFormatInstructions contains tool names") {
+        let result = ToolCallHandler.buildOutputFormatInstructions(toolNames: ["get_weather", "search"])
+        try assertTrue(result.contains("get_weather"), "missing tool name")
+        try assertTrue(result.contains("search"), "missing tool name")
+        try assertTrue(result.contains("tool_calls"), "missing format instruction")
+    }
+
+    test("buildFallbackPrompt returns empty for no tools") {
+        let result = ToolCallHandler.buildFallbackPrompt(tools: [])
+        try assertEqual(result, "")
+    }
+
+    test("buildFallbackPrompt includes schemas for given tools") {
+        let tools = [ToolDef(name: "fn", description: "Does stuff", parametersJSON: nil)]
+        let result = ToolCallHandler.buildFallbackPrompt(tools: tools)
+        try assertTrue(result.contains("fn"), "missing tool name")
+        try assertTrue(result.contains("Does stuff"), "missing description")
+    }
 }

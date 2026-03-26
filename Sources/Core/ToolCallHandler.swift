@@ -24,8 +24,48 @@ public enum ToolCallHandler {
 
     // MARK: - System Prompt Building
 
-    /// Build the tool-calling instruction block to inject into session instructions.
-    /// Uses JSONSerialization for proper escaping of tool names/descriptions.
+    /// Build output format instructions only (no tool schemas).
+    /// Always needed — tells the model HOW to respond with tool calls.
+    public static func buildOutputFormatInstructions(toolNames: [String]) -> String {
+        let nameList = toolNames.joined(separator: ", ")
+        return """
+        ## Tool Calling Format
+        When you need to call a function (\(nameList)), respond ONLY with this exact JSON (no other text before or after):
+        {"tool_calls": [{"id": "call_<unique>", "type": "function", "function": {"name": "<name>", "arguments": "<escaped_json_string>"}}]}
+
+        Replace <unique> with a short unique string, <name> with the function name, and <escaped_json_string> with the arguments as a JSON-encoded string.
+        """
+    }
+
+    /// Build text-based schema injection for tools that failed native conversion.
+    public static func buildFallbackPrompt(tools: [ToolDef]) -> String {
+        guard !tools.isEmpty else { return "" }
+        var schemaObjects: [[String: Any]] = []
+        for tool in tools {
+            var obj: [String: Any] = ["name": tool.name]
+            if let desc = tool.description { obj["description"] = desc }
+            if let params = tool.parametersJSON,
+               let data = params.data(using: .utf8),
+               let parsed = try? JSONSerialization.jsonObject(with: data) {
+                obj["parameters"] = parsed
+            }
+            schemaObjects.append(obj)
+        }
+        let schemasJSON: String
+        if let data = try? JSONSerialization.data(withJSONObject: schemaObjects, options: [.prettyPrinted, .sortedKeys]),
+           let str = String(data: data, encoding: .utf8) {
+            schemasJSON = str
+        } else {
+            schemasJSON = "[]"
+        }
+        return """
+        Additional function schemas (text fallback):
+        \(schemasJSON)
+        """
+    }
+
+    /// Build the full tool-calling instruction block (convenience — combines format + schemas).
+    /// Used when ALL tools need text injection (no native ToolDefinitions).
     public static func buildSystemPrompt(tools: [ToolDef]) -> String {
         var schemaObjects: [[String: Any]] = []
         for tool in tools {

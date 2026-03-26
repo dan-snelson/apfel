@@ -2,9 +2,9 @@
 // ContextManager.swift — Convert OpenAI messages to LanguageModelSession
 // Part of apfel — Apple Intelligence from the command line
 //
-// Uses FoundationModels Transcript API (macOS 26.1+) to reconstruct session
-// state from OpenAI's stateless message history — NO re-inference on history.
-// This is the core fix for the broken history-replay bug in the old Handlers.swift.
+// Uses FoundationModels Transcript API to reconstruct session state from
+// OpenAI's stateless message history — NO re-inference on history.
+// Uses native Transcript.ToolDefinition and Transcript.ToolCalls where possible.
 // ============================================================================
 
 import FoundationModels
@@ -19,27 +19,41 @@ enum ContextManager {
     /// Returns the session (with history baked in) + the final user prompt.
     ///
     /// Architecture:
-    /// - system message → Transcript.Instructions
+    /// - system message → Transcript.Instructions (with native ToolDefinitions)
     /// - user messages in history → Transcript.Prompt
-    /// - assistant messages in history → Transcript.Response
+    /// - assistant tool_calls → Transcript.ToolCalls (native, not serialized JSON)
+    /// - assistant text → Transcript.Response
     /// - tool result messages → Transcript.ToolOutput
-    /// - tools list → injected into Instructions via ToolCallHandler
     /// - last user message → returned as finalPrompt (caller sends it via respond())
     static func makeSession(
         messages: [OpenAIMessage],
         tools: [OpenAITool]?,
-        options: SessionOptions
+        options: SessionOptions,
+        jsonMode: Bool = false
     ) async throws -> (session: LanguageModelSession, finalPrompt: String) {
         let conversation = messages.filter { $0.role != "system" }
         guard let finalPrompt = conversation.last?.textContent, !finalPrompt.isEmpty else {
             throw ApfelError.unknown("Last message has no text content")
         }
         let history = Array(conversation.dropLast())
-
         let model = makeModel(permissive: options.permissive)
 
-        // Build instructions (system prompt + tool injection)
-        let instrText = buildInstructions(messages: messages, tools: tools)
+        // Convert tools: native ToolDefinitions + text fallback for failures
+        var nativeToolDefs: [Transcript.ToolDefinition] = []
+        var fallbackTools: [ToolDef] = []
+        if let tools = tools, !tools.isEmpty {
+            let converted = SchemaConverter.convert(tools: tools)
+            nativeToolDefs = converted.native
+            fallbackTools = converted.fallback
+        }
+
+        // Build instruction text
+        let instrText = buildInstructions(
+            messages: messages,
+            tools: tools,
+            fallbackTools: fallbackTools,
+            jsonMode: jsonMode
+        )
 
         // Budget-aware history: count tokens and keep newest messages that fit
         let tc = TokenCounter.shared
@@ -50,24 +64,29 @@ enum ContextManager {
         }
 
         // Walk history newest-first, keep messages that fit within budget
-        var keptHistory: [(role: String, msg: OpenAIMessage)] = []
+        var keptHistory: [OpenAIMessage] = []
         for msg in history.reversed() {
             let text = msg.textContent ?? msg.tool_call_id ?? ""
             let tokens = await tc.count(text)
             if usedTokens + tokens > budget { break }
             usedTokens += tokens
-            keptHistory.insert((msg.role, msg), at: 0)
+            keptHistory.insert(msg, at: 0)
         }
 
         // Build transcript entries
         var entries: [Transcript.Entry] = []
-        if !instrText.isEmpty {
-            let seg = Transcript.TextSegment(content: instrText)
-            let instr = Transcript.Instructions(segments: [.text(seg)], toolDefinitions: [])
+
+        // Instructions with native tool definitions
+        if !instrText.isEmpty || !nativeToolDefs.isEmpty {
+            let segments: [Transcript.Segment] = instrText.isEmpty ? [] : [
+                .text(Transcript.TextSegment(content: instrText))
+            ]
+            let instr = Transcript.Instructions(segments: segments, toolDefinitions: nativeToolDefs)
             entries.append(.instructions(instr))
         }
 
-        for (_, msg) in keptHistory {
+        // History entries
+        for msg in keptHistory {
             switch msg.role {
             case "user":
                 if let text = msg.textContent {
@@ -77,17 +96,24 @@ enum ContextManager {
                     entries.append(.prompt(prompt))
                 }
             case "assistant":
-                let text: String
-                if let calls = msg.tool_calls, !calls.isEmpty,
-                   let json = try? JSONEncoder().encode(calls),
-                   let str = String(data: json, encoding: .utf8) {
-                    text = str
+                if let calls = msg.tool_calls, !calls.isEmpty {
+                    // Native ToolCalls entry — semantically correct
+                    let transcriptCalls = calls.map { call in
+                        let args = SchemaConverter.makeArguments(call.function.arguments)
+                        return Transcript.ToolCall(
+                            id: call.id,
+                            toolName: call.function.name,
+                            arguments: args
+                        )
+                    }
+                    let toolCalls = Transcript.ToolCalls(transcriptCalls)
+                    entries.append(.toolCalls(toolCalls))
                 } else {
-                    text = msg.textContent ?? ""
+                    let text = msg.textContent ?? ""
+                    let seg = Transcript.TextSegment(content: text)
+                    let resp = Transcript.Response(assetIDs: [], segments: [.text(seg)])
+                    entries.append(.response(resp))
                 }
-                let seg = Transcript.TextSegment(content: text)
-                let resp = Transcript.Response(assetIDs: [], segments: [.text(seg)])
-                entries.append(.response(resp))
             case "tool":
                 let text = msg.textContent ?? ""
                 let seg = Transcript.TextSegment(content: text)
@@ -114,22 +140,33 @@ enum ContextManager {
 
     // MARK: - Instructions Builder
 
-    private static func buildInstructions(messages: [OpenAIMessage], tools: [OpenAITool]?) -> String {
+    private static func buildInstructions(
+        messages: [OpenAIMessage],
+        tools: [OpenAITool]?,
+        fallbackTools: [ToolDef],
+        jsonMode: Bool
+    ) -> String {
         var parts: [String] = []
 
+        // JSON mode instruction
+        if jsonMode {
+            parts.append("You must respond with valid JSON only. No markdown code fences, no explanation text, no preamble. Output raw JSON.")
+        }
+
+        // System prompt
         if let sys = messages.first(where: { $0.role == "system" })?.textContent {
             parts.append(sys)
         }
 
+        // Tool output format instructions (always needed when tools are present)
         if let tools = tools, !tools.isEmpty {
-            let defs = tools.map {
-                ToolDef(
-                    name: $0.function.name,
-                    description: $0.function.description,
-                    parametersJSON: $0.function.parameters?.value
-                )
-            }
-            parts.append(ToolCallHandler.buildSystemPrompt(tools: defs))
+            let names = tools.map(\.function.name)
+            parts.append(ToolCallHandler.buildOutputFormatInstructions(toolNames: names))
+        }
+
+        // Text fallback for tools that failed native conversion
+        if !fallbackTools.isEmpty {
+            parts.append(ToolCallHandler.buildFallbackPrompt(tools: fallbackTools))
         }
 
         return parts.joined(separator: "\n\n")

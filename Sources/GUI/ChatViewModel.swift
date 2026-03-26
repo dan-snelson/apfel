@@ -112,7 +112,7 @@ class ChatViewModel {
             updateMessage(id: assistantId) { msg in
                 msg.isStreaming = false
                 msg.durationMs = durationMs
-                msg.tokenCount = max(1, msg.content.count / 4)
+                msg.tokenCount = nil  // real count comes from server usage stats
                 msg.responseJSON = rawResponse
             }
             if shouldExcludeTurnFromHistory(assistantContent) {
@@ -284,7 +284,7 @@ class ChatViewModel {
                 updateMessage(id: msgId) { msg in
                     msg.isStreaming = false
                     msg.durationMs = durationMs
-                    msg.tokenCount = max(1, msg.content.count / 4)
+                    msg.tokenCount = nil  // real count comes from server usage stats
                     msg.responseJSON = rawResponse
                 }
 

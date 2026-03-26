@@ -155,7 +155,24 @@ func startServer(config: ServerConfig) async throws {
         return jsonResponse(jsonString(stats))
     }
 
-    // Note: CORS headers are added via jsonResponse() helper when config.cors is true
+    // CORS OPTIONS preflight for browser clients
+    for endpoint: RouterPath in ["/v1/chat/completions", "/v1/models", "/v1/completions", "/v1/embeddings"] {
+        router.on(endpoint, method: .options) { _, _ -> Response in
+            var headers = HTTPFields()
+            headers[.init("Access-Control-Allow-Origin")!] = "*"
+            headers[.init("Access-Control-Allow-Methods")!] = "GET, POST, OPTIONS"
+            headers[.init("Access-Control-Allow-Headers")!] = "Content-Type, Authorization"
+            return Response(status: .noContent, headers: headers)
+        }
+    }
+
+    // Stub endpoints — honest about unsupported features
+    router.post("/v1/completions") { _, _ -> Response in
+        openAIError(status: .init(code: 501), message: "Text completions not supported. Use /v1/chat/completions.", type: "invalid_request_error")
+    }
+    router.post("/v1/embeddings") { _, _ -> Response in
+        openAIError(status: .init(code: 501), message: "Embeddings not supported by Apple's on-device model.", type: "invalid_request_error")
+    }
 
     let app = Application(
         router: router,

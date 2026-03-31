@@ -27,34 +27,18 @@ Every Mac with Apple Silicon has a **built-in LLM** - Apple's on-device foundati
 
 ## Requirements
 
-| Requirement | Details |
-|-------------|---------|
-| **Mac** | Apple Silicon (M1 or later) |
-| **macOS** | **macOS 26.4** or later |
-| **Apple Intelligence** | Must be [enabled in System Settings](https://support.apple.com/en-us/121115) |
-| **Swift** | Swift 6.2+ with developer tools that include the **macOS 26.4 SDK** |
-| **Xcode** | **NOT required** - current Command Line Tools are enough |
-
-Check if you're ready:
-
-```bash
-# Check macOS version (needs 26+)
-sw_vers
-
-# Check Swift is installed
-swift --version
-
-# Check the active Apple SDK version (must be 26.4+)
-xcrun --show-sdk-version
-
-# Check which developer tools are selected
-xcode-select -p
-
-# If Swift is missing, install Command Line Tools:
-xcode-select --install
-```
+Apple Silicon Mac, macOS 26.4+, [Apple Intelligence enabled](https://support.apple.com/en-us/121115). No Xcode needed.
 
 ## Install
+
+**Homebrew** (recommended):
+
+```bash
+brew tap Arthur-Ficial/tap
+brew install Arthur-Ficial/tap/apfel
+```
+
+**Build from source** (requires macOS 26.4 SDK):
 
 ```bash
 git clone https://github.com/Arthur-Ficial/apfel.git
@@ -62,54 +46,7 @@ cd apfel
 make install
 ```
 
-Or install with Homebrew:
-
-```bash
-brew tap Arthur-Ficial/tap
-brew install Arthur-Ficial/tap/apfel
-```
-
-That's it. `make install` does everything:
-1. Auto-bumps the version number
-2. Builds a release binary
-3. Installs to `/usr/local/bin/apfel`
-
-If `make install` fails with errors like:
-
-```text
-value of type 'SystemLanguageModel' has no member 'tokenCount'
-value of type 'SystemLanguageModel' has no member 'contextSize'
-```
-
-your Mac may already be on macOS 26.4, but your selected Command Line Tools are older than the macOS 26.4 SDK.
-
-`apfel` only requires Command Line Tools. It does **not** require Xcode.
-
-Fix path:
-
-```bash
-# update/install Command Line Tools
-xcode-select --install
-
-# ensure the CLT developer dir is selected
-sudo xcode-select -s /Library/Developer/CommandLineTools
-
-# confirm the active SDK is new enough
-xcrun --show-sdk-version
-
-# retry
-make install
-```
-
-`xcrun --show-sdk-version` must print `26.4` or newer.
-
-Verify it works:
-
-```bash
-apfel "Hello, world!"
-apfel --version
-apfel --release       # full build info
-```
+Detailed instructions, requirements, and troubleshooting: [docs/install.md](docs/install.md)
 
 ## Quick Start
 

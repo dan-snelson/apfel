@@ -1,4 +1,4 @@
-# apfel — Project Instructions
+# apfel - Project Instructions
 
 ## The Golden Goal
 
@@ -32,7 +32,7 @@ The Debug GUI has been extracted to its own repo: [apfel-gui](https://github.com
 ### Non-negotiable principles:
 
 - **100% on-device.** No cloud, no API keys, no network for inference. Ever.
-- **Honest about limitations.** 4096 token context, no embeddings, no vision — say so clearly.
+- **Honest about limitations.** 4096 token context, no embeddings, no vision - say so clearly.
 - **Clean code, clean logic.** No hacks. Proper error types. Real token counts.
 - **Swift 6 strict concurrency.** No data races.
 
@@ -64,7 +64,7 @@ swift build                    # debug build (uses "dev" version stub)
 swift run apfel-tests          # run pure Swift unit tests
 ```
 
-**Version is in `.version` file** (single source of truth). Every `make build`/`make install` auto-bumps the patch number, updates README badge, and generates `Sources/BuildInfo.swift`. No manual version editing — ever.
+**Version is in `.version` file** (single source of truth). Every `make build`/`make install` auto-bumps the patch number, updates README badge, and generates `Sources/BuildInfo.swift`. No manual version editing - ever.
 
 **Always use `make install` for testing changes** - `swift run` uses a debug build, and the installed binary at `/usr/local/bin/apfel` won't reflect your changes until you run `make install`.
 
@@ -95,5 +95,5 @@ python3 -m pytest Tests/integration/ -v    # release-binary integration tests
 
 - **`macos-26` runner** has Xcode-bundled SDKs (not standalone CLT). The workflow selects the latest available Xcode via `xcode-select` before building.
 - apfel requires **SDK 26.4+** for FoundationModels token-counting APIs (`tokenCount`, `contextSize`). If the runner's highest Xcode is older, the build will fail.
-- **`HOMEBREW_TAP_PUSH_TOKEN`** secret must exist on `Arthur-Ficial/apfel` — fine-grained token with Contents R/W on `Arthur-Ficial/homebrew-tap`.
+- **`HOMEBREW_TAP_PUSH_TOKEN`** secret must exist on `Arthur-Ficial/apfel` - fine-grained token with Contents R/W on `Arthur-Ficial/homebrew-tap`.
 - Release docs: `docs/release.md`

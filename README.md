@@ -131,7 +131,7 @@ demo/cmd -c "list open ports"                   # -c = copy to clipboard
 **Shell function version** - add to your `.zshrc` and use `cmd` from anywhere:
 
 ```bash
-# cmd — natural language to shell command (apfel). Add to .zshrc:
+# cmd - natural language to shell command (apfel). Add to .zshrc:
 cmd(){ local x c r a; while [[ $1 == -* ]]; do case $1 in -x)x=1;shift;; -c)c=1;shift;; *)break;; esac; done; r=$(apfel -q -s 'Output only a shell command.' "$*" | sed '/^```/d;/^#/d;s/^[[:space:]]*//;/^$/d' | head -1); [[ $r ]] || { echo "no command generated"; return 1; }; printf '\e[32m$\e[0m %s\n' "$r"; [[ $c ]] && printf %s "$r" | pbcopy && echo "(copied)"; [[ $x ]] && { printf 'Run? [y/N] '; read -r a; [[ $a == y ]] && eval "$r"; }; return 0; }
 ```
 
@@ -169,7 +169,7 @@ Also in `demo/`:
 
 ### Debug GUI
 
-**[apfel-gui](https://github.com/Arthur-Ficial/apfel-gui)** — native macOS SwiftUI app for chatting with Apple Intelligence and inspecting every request/response.
+**[apfel-gui](https://github.com/Arthur-Ficial/apfel-gui)** - native macOS SwiftUI app for chatting with Apple Intelligence and inspecting every request/response.
 
 ![apfel GUI](screenshots/gui-chat.png)
 
@@ -183,7 +183,7 @@ cd apfel-gui && make install
 apfel-gui
 ```
 
-Chat, debug inspector, request logs, context settings, speech-to-text, text-to-speech — all on-device. See the [apfel-gui repo](https://github.com/Arthur-Ficial/apfel-gui) for details.
+Chat, debug inspector, request logs, context settings, speech-to-text, text-to-speech - all on-device. See the [apfel-gui repo](https://github.com/Arthur-Ficial/apfel-gui) for details.
 
 ## OpenAI API Compatibility
 
@@ -340,7 +340,7 @@ Every `make build`/`make install` automatically:
 
 ## Related Projects
 
-- [apfel-gui](https://github.com/Arthur-Ficial/apfel-gui) — Native macOS SwiftUI debug GUI for apfel (chat, request inspector, logs, TTS/STT)
+- [apfel-gui](https://github.com/Arthur-Ficial/apfel-gui) - Native macOS SwiftUI debug GUI for apfel (chat, request inspector, logs, TTS/STT)
 
 ## Examples
 

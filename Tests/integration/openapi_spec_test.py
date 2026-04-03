@@ -502,7 +502,6 @@ def test_health_schema():
 # ============================================================================
 
 def test_cors_preflight():
-    """OPTIONS returns CORS headers."""
+    """OPTIONS returns 204 (CORS headers only when --cors enabled)."""
     resp = httpx.options(f"{BASE_URL}/v1/chat/completions", timeout=10)
     assert resp.status_code == 204
-    assert "access-control-allow-origin" in resp.headers

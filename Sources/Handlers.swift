@@ -222,9 +222,6 @@ private func streamingResponse(
     headers[.contentType] = "text/event-stream"
     headers[.cacheControl] = "no-cache"
     headers[.init("Connection")!] = "keep-alive"
-    if serverState?.config.cors == true {
-        headers[.init("Access-Control-Allow-Origin")!] = "*"
-    }
     let eventBox = TraceBuffer(events: events + ["stream start"])
 
     let responseStream = AsyncStream<ByteBuffer> { continuation in
@@ -395,8 +392,5 @@ func openAIError(status: HTTPResponse.Status, message: String, type: String, cod
     let body = jsonString(error)
     var headers = HTTPFields()
     headers[.contentType] = "application/json"
-    if serverState?.config.cors == true {
-        headers[.init("Access-Control-Allow-Origin")!] = "*"
-    }
     return Response(status: status, headers: headers, body: .init(byteBuffer: ByteBuffer(string: body)))
 }

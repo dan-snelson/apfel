@@ -49,6 +49,7 @@ suite("ToolCallHandlerTests") { runToolCallHandlerTests() }
 suite("ContextStrategyTests") { runContextStrategyTests() }
 suite("OpenAIModelsTests") { runOpenAIModelsTests() }
 suite("ChatRequestValidatorTests") { runChatRequestValidatorTests() }
+suite("OriginValidatorTests") { runOriginValidatorTests() }
 
 // MARK: - Summary
 

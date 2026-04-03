@@ -1,11 +1,12 @@
 # apfel
 
-[![Version 0.6.13](https://img.shields.io/badge/version-0.6.13-blue)](https://github.com/Arthur-Ficial/apfel)
+[![Version 0.6.22](https://img.shields.io/badge/version-0.6.22-blue)](https://github.com/Arthur-Ficial/apfel)
 [![Swift 6.3+](https://img.shields.io/badge/Swift-6.3%2B-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white)](https://developer.apple.com/macos/)
 [![No Xcode Required](https://img.shields.io/badge/Xcode-not%20required-orange)](https://developer.apple.com/xcode/resources/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![100% On-Device](https://img.shields.io/badge/inference-100%25%20on--device-green)](https://developer.apple.com/documentation/foundationmodels)
+[![Website](https://img.shields.io/badge/web-apfel.franzai.com-16A34A)](https://apfel.franzai.com)
 
 Use the **FREE** local Apple Intelligence LLM on your Mac - your model, your machine, your way.
 
@@ -316,8 +317,15 @@ apfel --release                Show detailed release and build info
 | `--port <n>` | Server port (default: 11434) |
 | `--host <addr>` | Bind address (default: 127.0.0.1) |
 | `--cors` | Enable CORS headers for browser clients |
+| `--allowed-origins <origins>` | Add comma-separated allowed origins to the localhost defaults |
+| `--no-origin-check` | Disable origin checking (allow all origins) |
+| `--token <secret>` | Require Bearer token authentication |
+| `--token-auto` | Generate and print a random Bearer token |
+| `--footgun` | Disable all protections (`--no-origin-check` + `--cors`) |
 | `--max-concurrent <n>` | Max concurrent requests (default: 5) |
 | `--debug` | Verbose logging |
+
+See [Server Security](docs/server-security.md) for detailed documentation on security options.
 
 ### Exit Codes
 
@@ -338,6 +346,7 @@ apfel --release                Show detailed release and build info
 | `APFEL_SYSTEM_PROMPT` | Default system prompt |
 | `APFEL_HOST` | Server bind address |
 | `APFEL_PORT` | Server port |
+| `APFEL_TOKEN` | Bearer token for server authentication |
 | `APFEL_TEMPERATURE` | Default temperature |
 | `APFEL_MAX_TOKENS` | Default max tokens |
 | `APFEL_CONTEXT_STRATEGY` | Default context strategy |

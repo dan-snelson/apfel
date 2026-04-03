@@ -226,10 +226,9 @@ def test_embeddings_stub_501():
 # MARK: - CORS
 
 def test_cors_preflight():
-    """OPTIONS preflight returns CORS headers."""
+    """OPTIONS preflight returns 204 (CORS headers only when --cors enabled)."""
     resp = httpx.options(f"{BASE_URL.replace('/v1', '')}/v1/chat/completions")
     assert resp.status_code == 204
-    assert "access-control-allow-origin" in resp.headers
 
 
 # MARK: - Health

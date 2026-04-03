@@ -296,6 +296,12 @@ func printUsage() {
           --port <number>        Server port [default: 11434]
           --host <address>       Bind address [default: 127.0.0.1]
           --cors                 Enable CORS headers for browser clients
+          --allowed-origins <origins>
+                                 Add comma-separated origins to localhost defaults
+          --no-origin-check      Disable origin checking (allow all origins)
+          --token <secret>       Require Bearer token authentication
+          --token-auto           Generate and print a random Bearer token
+          --footgun              Disable all protections (--no-origin-check + --cors)
           --max-concurrent <n>   Max concurrent model requests [default: 5]
           --debug                Verbose logging
 
@@ -303,6 +309,7 @@ func printUsage() {
       APFEL_SYSTEM_PROMPT       Default system prompt
       APFEL_HOST                Server bind address [default: 127.0.0.1]
       APFEL_PORT                Server port [default: 11434]
+      APFEL_TOKEN               Bearer token for server authentication
       APFEL_TEMPERATURE         Default temperature
       APFEL_MAX_TOKENS          Default max tokens
       APFEL_CONTEXT_STRATEGY    Default context strategy

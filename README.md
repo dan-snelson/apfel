@@ -1,6 +1,6 @@
 # apfel
 
-[![Version 0.7.5](https://img.shields.io/badge/version-0.7.5-blue)](https://github.com/Arthur-Ficial/apfel)
+[![Version 0.7.7](https://img.shields.io/badge/version-0.7.7-blue)](https://github.com/Arthur-Ficial/apfel)
 [![Swift 6.3+](https://img.shields.io/badge/Swift-6.3%2B-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![macOS 26+](https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white)](https://developer.apple.com/macos/)
 [![No Xcode Required](https://img.shields.io/badge/Xcode-not%20required-orange)](https://developer.apple.com/xcode/resources/)
@@ -33,6 +33,7 @@ Every Mac with Apple Silicon has a **built-in LLM** - Apple's on-device foundati
 ```bash
 brew tap Arthur-Ficial/tap
 brew install Arthur-Ficial/tap/apfel
+brew upgrade apfel                     # update to latest
 ```
 
 **Build from source:**
@@ -122,6 +123,13 @@ apfel --chat --context-strategy sliding-window --context-max-turns 6
 apfel --chat --context-strategy summarize        # compress old turns via on-device model
 apfel --chat --context-strategy strict           # error on overflow, no trimming
 apfel --chat --context-output-reserve 256        # custom output token reserve
+```
+
+### Updating
+
+```bash
+apfel --update                  # check for updates and upgrade via Homebrew (v0.7.7+)
+brew upgrade apfel              # or update directly via Homebrew
 ```
 
 ### Benchmarking

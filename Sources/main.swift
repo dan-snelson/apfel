@@ -299,6 +299,9 @@ while i < args.count {
     case "--model-info":
         mode = "model-info"
 
+    case "--update":
+        mode = "update"
+
     case "-f", "--file":
         i += 1
         guard i < args.count else {
@@ -369,7 +372,7 @@ let sessionOpts = SessionOptions(
 )
 
 // Check model availability for modes that need it
-if mode != "model-info" && mode != "serve" {
+if mode != "model-info" && mode != "serve" && mode != "update" {
     let available = await TokenCounter.shared.isAvailable
     if !available {
         printError("Apple Intelligence is not enabled or model is not ready. Run: apfel --model-info")
@@ -409,6 +412,9 @@ do {
             publicHealth: serverPublicHealth
         )
         try await startServer(config: config, mcpManager: mcpManager)
+
+    case "update":
+        performUpdate()
 
     case "model-info":
         await printModelInfo()

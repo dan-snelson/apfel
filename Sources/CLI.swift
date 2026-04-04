@@ -290,6 +290,102 @@ func printRelease() {
     """)
 }
 
+// MARK: - Self-Update
+
+/// Check for updates and optionally run `brew upgrade apfel`.
+/// Detects install method from the binary path, prompts y/N on TTY.
+func performUpdate() {
+    let current = version
+    let execPath = ProcessInfo.processInfo.arguments[0]
+    let resolved = (execPath as NSString).resolvingSymlinksInPath
+
+    let isBrew = resolved.contains("/homebrew/Cellar/apfel/") || resolved.contains("/homebrew/opt/apfel/")
+
+    if isBrew {
+        print("\(appName) v\(current) (installed via Homebrew)")
+    } else {
+        print("\(appName) v\(current) (installed from source)")
+        print("To update: git pull && make install")
+        print("Or visit: https://github.com/Arthur-Ficial/apfel/releases")
+        return
+    }
+
+    // Check for updates via brew
+    let outdatedJSON = shellOutput("/opt/homebrew/bin/brew", args: ["info", "--json=v2", "apfel"])
+    guard let data = outdatedJSON.data(using: .utf8),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let formulae = json["formulae"] as? [[String: Any]],
+          let formula = formulae.first,
+          let installed = formula["installed"] as? [[String: Any]],
+          let installedVersion = installed.first?["version"] as? String,
+          let stable = (formula["versions"] as? [String: Any])?["stable"] as? String else {
+        print("Could not check for updates. Try: brew upgrade apfel")
+        return
+    }
+
+    if installedVersion == stable {
+        print(styled("Already up to date.", .green))
+        return
+    }
+
+    print("Update available: \(styled("v\(stable)", .green))")
+    print("")
+
+    // Non-interactive: report only
+    guard isatty(STDIN_FILENO) != 0 else {
+        print("Run `apfel --update` in a terminal to update.")
+        return
+    }
+
+    print("Update now? [y/N] ", terminator: "")
+    fflush(stdout)
+    guard let answer = readLine(), answer.lowercased() == "y" else {
+        print("Cancelled.")
+        return
+    }
+
+    print(styled("Running: brew upgrade apfel", .dim))
+    let result = shellPassthrough("/opt/homebrew/bin/brew", args: ["upgrade", "apfel"])
+    if result == 0 {
+        let newVersion = shellOutput("/opt/homebrew/bin/apfel", args: ["--version"]).trimmingCharacters(in: .whitespacesAndNewlines)
+        print(styled("Updated to \(newVersion)", .green))
+    } else {
+        printError("brew upgrade failed (exit \(result)). Try manually: brew upgrade apfel")
+    }
+}
+
+/// Run a command and capture stdout.
+private func shellOutput(_ executable: String, args: [String]) -> String {
+    let proc = Process()
+    let pipe = Pipe()
+    proc.executableURL = URL(fileURLWithPath: executable)
+    proc.arguments = args
+    proc.standardOutput = pipe
+    proc.standardError = FileHandle.nullDevice
+    do {
+        try proc.run()
+        proc.waitUntilExit()
+    } catch {
+        return ""
+    }
+    return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+}
+
+/// Run a command with stdout/stderr passed through to the terminal.
+@discardableResult
+private func shellPassthrough(_ executable: String, args: [String]) -> Int32 {
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: executable)
+    proc.arguments = args
+    do {
+        try proc.run()
+        proc.waitUntilExit()
+    } catch {
+        return 1
+    }
+    return proc.terminationStatus
+}
+
 // MARK: - Usage
 
 /// Print the help text. Styled with ANSI colors when on a TTY.
@@ -319,6 +415,7 @@ func printUsage() {
           --permissive           Use permissive content guardrails
           --model-info           Print model capabilities and exit
           --benchmark            Run internal performance benchmarks
+          --update               Check for updates and upgrade via Homebrew
       -h, --help                Show this help
       -v, --version             Print version
           --release             Show detailed release and build info

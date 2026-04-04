@@ -331,3 +331,36 @@ def test_file_flag_with_stdin_and_prompt():
         assert "42" in payload["content"]
     finally:
         tmp.unlink(missing_ok=True)
+
+
+# --- Self-update tests (--update) ---
+
+
+def test_update_flag_exits_success():
+    """--update should exit 0 regardless of install method."""
+    result = run_cli(["--update"])
+    assert result.returncode == 0
+
+
+def test_update_shows_version():
+    """--update output should contain the current version."""
+    result = run_cli(["--update"])
+    assert "apfel v" in result.stdout
+
+
+def test_update_detects_install_method():
+    """--update should identify either 'Homebrew' or 'from source'."""
+    result = run_cli(["--update"])
+    assert "Homebrew" in result.stdout or "from source" in result.stdout
+
+
+def test_update_in_help():
+    """--update should appear in the help text."""
+    result = run_cli(["--help"])
+    assert "--update" in result.stdout
+
+
+def test_update_non_interactive():
+    """--update with piped stdin should not hang waiting for input."""
+    result = run_cli(["--update"], input_text="", timeout=30)
+    assert result.returncode == 0

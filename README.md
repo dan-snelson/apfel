@@ -124,6 +124,15 @@ apfel --chat --context-strategy strict           # error on overflow, no trimmin
 apfel --chat --context-output-reserve 256        # custom output token reserve
 ```
 
+### Benchmarking
+
+Measure internal overhead on the installed release binary:
+
+```bash
+apfel --benchmark -o json
+make benchmark
+```
+
 ### File attachments (`-f/--file`)
 
 Attach one or more files to any prompt with `-f`. File contents are prepended to your prompt text. The flag is repeatable - use it as many times as you need.
@@ -306,6 +315,7 @@ apfel --chat                            Interactive conversation
 apfel --stream <prompt>                 Stream response tokens
 apfel --serve                           Start OpenAI-compatible server
 apfel --serve --mcp <server.py>         Server with MCP tools
+apfel --benchmark                       Run internal performance benchmarks
 apfel --model-info                      Print model capabilities
 ```
 
@@ -324,6 +334,7 @@ apfel --model-info                      Print model capabilities
 | `--max-tokens <n>` | Maximum response tokens |
 | `--mcp <path>` | Attach MCP tool server (repeatable). See [MCP docs](docs/mcp-calculator.md) |
 | `--permissive` | Use permissive content guardrails |
+| `--benchmark` | Run internal performance benchmarks |
 | `--model-info` | Print model capabilities and exit |
 | `--release` | Show detailed version, build, and capability info |
 | `-v, --version` | Print version |
@@ -419,6 +430,8 @@ swift build                              # quick debug build
 swift run apfel-tests                    # pure Swift unit tests (no XCTest needed)
 apfel --serve --debug &                  # start server for integration tests
 python3 -m pytest Tests/integration/ -v  # integration tests (requires server)
+apfel --benchmark -o json                # performance report from the installed binary
+make benchmark                           # same benchmark via Makefile
 ```
 
 Every `make build`/`make install` automatically:

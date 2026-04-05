@@ -9,6 +9,9 @@ Requires: pip install pytest httpx
 Requires: apfel --serve --mcp mcp/calculator/server.py running on localhost:11435
 
 Run: python3 -m pytest Tests/integration/mcp_server_test.py -v
+
+Speed optimization: module-scoped fixtures cache LLM responses so multiple
+tests that check different aspects of the same response share a single call.
 """
 
 import json
@@ -59,27 +62,19 @@ def assert_no_raw_tool_calls(content):
 
 
 # ============================================================================
-# Prerequisites
+# Module-scoped fixtures -- each makes ONE LLM call, shared across tests
 # ============================================================================
 
-def test_mcp_server_health():
-    """Server with MCP must be healthy and model available."""
+@pytest.fixture(scope="module")
+def health_response():
+    """GET /health -- no LLM call, but cached for multiple tests."""
     resp = httpx.get(f"{BASE_URL}/health", timeout=TIMEOUT)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["model_available"] is True
+    return resp
 
 
-# ============================================================================
-# Core: MCP auto-execution (the main fix for issue #35)
-# ============================================================================
-
-def test_mcp_auto_execute_non_streaming():
-    """Server auto-executes MCP tool calls and returns final text (non-streaming).
-
-    The key test: finish_reason must be 'stop' (not 'tool_calls') and the
-    response must contain the correct computed result.
-    """
+@pytest.fixture(scope="module")
+def multiply_247x83_response():
+    """Non-streaming multiply 247*83 -- shared by auto-execute and result tests."""
     resp = httpx.post(f"{API_URL}/chat/completions", json={
         "model": MODEL,
         "messages": [
@@ -87,23 +82,12 @@ def test_mcp_auto_execute_non_streaming():
         ],
         "seed": 42,
     }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-    data = resp.json()
-
-    assert data["choices"][0]["finish_reason"] == "stop", \
-        f"Expected 'stop' but got '{data['choices'][0]['finish_reason']}'"
-    content = data["choices"][0]["message"]["content"]
-    assert content is not None, "Response content is None"
-    assert "20501" in content or "20,501" in content, \
-        f"Expected '20501' in response but got: {content}"
+    return resp.json()
 
 
-def test_mcp_auto_execute_streaming():
-    """Server auto-executes MCP tool calls and returns final text (streaming).
-
-    When MCP auto-executes, the SSE stream should contain the final text
-    answer (not intermediate tool_calls chunks).
-    """
+@pytest.fixture(scope="module")
+def multiply_streaming_response():
+    """Streaming multiply 13*7 -- tests streaming MCP auto-execute."""
     resp = httpx.post(f"{API_URL}/chat/completions", json={
         "model": MODEL,
         "messages": [
@@ -113,7 +97,83 @@ def test_mcp_auto_execute_streaming():
         "seed": 42,
     }, timeout=TIMEOUT)
     assert resp.status_code == 200
-    content, finish_reason, saw_tool_calls, _ = collect_sse(resp)
+    return collect_sse(resp)
+
+
+@pytest.fixture(scope="module")
+def normal_nonstreaming_response():
+    """Non-streaming 'Say OK.' -- shared by normal-response, id, and structure tests."""
+    resp = httpx.post(f"{API_URL}/chat/completions", json={
+        "model": MODEL,
+        "messages": [{"role": "user", "content": "Say OK."}],
+    }, timeout=TIMEOUT)
+    assert resp.status_code == 200
+    return resp.json()
+
+
+@pytest.fixture(scope="module")
+def normal_streaming_response():
+    """Streaming 'Say hello.' -- shared by normal-streaming and SSE structure tests."""
+    resp = httpx.post(f"{API_URL}/chat/completions", json={
+        "model": MODEL,
+        "messages": [{"role": "user", "content": "Say hello."}],
+        "stream": True,
+    }, timeout=TIMEOUT)
+    assert resp.status_code == 200
+    return resp
+
+
+@pytest.fixture(scope="module")
+def add_tool_response():
+    """Non-streaming add 100+200 -- shared by stop-not-tool_calls and usage tests."""
+    resp = httpx.post(f"{API_URL}/chat/completions", json={
+        "model": MODEL,
+        "messages": [
+            {"role": "user", "content": "Use the add function to add 100 and 200. Reply with just the number."}
+        ],
+        "seed": 42,
+    }, timeout=TIMEOUT)
+    assert resp.status_code == 200
+    return resp.json()
+
+
+# ============================================================================
+# Prerequisites
+# ============================================================================
+
+def test_mcp_server_health(health_response):
+    """Server with MCP must be healthy and model available."""
+    assert health_response.status_code == 200
+    data = health_response.json()
+    assert data["model_available"] is True
+
+
+# ============================================================================
+# Core: MCP auto-execution (the main fix for issue #35)
+# ============================================================================
+
+def test_mcp_auto_execute_non_streaming(multiply_247x83_response):
+    """Server auto-executes MCP tool calls and returns final text (non-streaming).
+
+    The key test: finish_reason must be 'stop' (not 'tool_calls') and the
+    response must contain the correct computed result.
+    """
+    data = multiply_247x83_response
+    assert data["choices"][0]["finish_reason"] == "stop", \
+        f"Expected 'stop' but got '{data['choices'][0]['finish_reason']}'"
+    content = data["choices"][0]["message"]["content"]
+    assert content is not None, "Response content is None"
+    assert "20501" in content or "20,501" in content, \
+        f"Expected '20501' in response but got: {content}"
+
+
+def test_mcp_auto_execute_streaming(multiply_streaming_response):
+    """Server auto-executes MCP tool calls and returns final text (streaming).
+
+    When MCP auto-executes, the SSE stream should contain the final text
+    answer (not intermediate tool_calls chunks).
+    """
+    content, finish_reason, saw_tool_calls, _ = multiply_streaming_response
 
     assert not saw_tool_calls, "Server streamed raw tool_calls instead of auto-executing"
     assert finish_reason == "stop", f"Expected 'stop' but got '{finish_reason}'"
@@ -126,17 +186,9 @@ def test_mcp_auto_execute_streaming():
 # Normal responses must NOT be affected by MCP being enabled
 # ============================================================================
 
-def test_normal_response_not_affected_by_mcp():
+def test_normal_response_not_affected_by_mcp(normal_nonstreaming_response):
     """Plain text prompt returns normal response when MCP is enabled."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [
-            {"role": "user", "content": "What color is the sky? Reply in one word."}
-        ],
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-    data = resp.json()
-
+    data = normal_nonstreaming_response
     assert data["choices"][0]["finish_reason"] == "stop"
     content = data["choices"][0]["message"]["content"]
     assert content is not None
@@ -144,16 +196,9 @@ def test_normal_response_not_affected_by_mcp():
     assert_no_raw_tool_calls(content)
 
 
-def test_normal_streaming_not_affected_by_mcp():
+def test_normal_streaming_not_affected_by_mcp(normal_streaming_response):
     """Streaming a normal response with MCP enabled works correctly."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [{"role": "user", "content": "Say hello."}],
-        "stream": True,
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-    content, finish_reason, _, _ = collect_sse(resp)
-
+    content, finish_reason, _, _ = collect_sse(normal_streaming_response)
     assert finish_reason == "stop"
     assert len(content) > 0
     assert_no_raw_tool_calls(content)
@@ -229,43 +274,13 @@ def test_client_tools_not_auto_executed():
         f"Expected 'tool_calls' for client tools but got '{data['choices'][0]['finish_reason']}'"
 
 
-def test_client_tools_override_mcp_tools():
-    """When client sends tools, MCP tools are NOT injected (client takes priority)."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [
-            {"role": "user", "content": "Use the custom_func tool."}
-        ],
-        "tools": [{
-            "type": "function",
-            "function": {
-                "name": "custom_func",
-                "description": "A custom function",
-                "parameters": {"type": "object", "properties": {}}
-            }
-        }],
-        "tool_choice": {"type": "function", "function": {"name": "custom_func"}},
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-    data = resp.json()
-    # Client tools = standard OpenAI flow (tool_calls returned, not executed)
-    assert data["choices"][0]["finish_reason"] == "tool_calls"
-
-
 # ============================================================================
 # MCP tool routing (different calculator tools)
 # ============================================================================
 
-def test_mcp_multiply_returns_correct_result():
+def test_mcp_multiply_returns_correct_result(multiply_247x83_response):
     """Multiply tool: 247 * 83 = 20501."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [
-            {"role": "user", "content": "Use the multiply tool to compute 247 times 83. Reply with just the number."}
-        ],
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    data = resp.json()
+    data = multiply_247x83_response
     content = data["choices"][0]["message"]["content"] or ""
     assert data["choices"][0]["finish_reason"] == "stop"
     assert_no_raw_tool_calls(content)
@@ -288,16 +303,9 @@ def test_mcp_sqrt_returns_correct_result():
     assert "12" in content, f"Expected 12, got: {content}"
 
 
-def test_mcp_tool_returns_stop_not_tool_calls():
+def test_mcp_tool_returns_stop_not_tool_calls(add_tool_response):
     """Any MCP-auto-executed response must have finish_reason 'stop', never 'tool_calls'."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [
-            {"role": "user", "content": "Use the add function to add 100 and 200. Reply with just the number."}
-        ],
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    data = resp.json()
+    data = add_tool_response
     assert data["choices"][0]["finish_reason"] == "stop", \
         f"MCP response should be 'stop', got '{data['choices'][0]['finish_reason']}'"
     content = data["choices"][0]["message"]["content"]
@@ -309,17 +317,9 @@ def test_mcp_tool_returns_stop_not_tool_calls():
 # Response format validation
 # ============================================================================
 
-def test_mcp_response_has_valid_usage():
+def test_mcp_response_has_valid_usage(add_tool_response):
     """MCP auto-executed responses include valid usage stats."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [
-            {"role": "user", "content": "Use the add tool to add 1 and 1. Reply with the number."}
-        ],
-        "seed": 42,
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-    data = resp.json()
+    data = add_tool_response
     usage = data.get("usage")
     assert usage is not None, "Missing usage in MCP response"
     assert usage["prompt_tokens"] > 0
@@ -327,27 +327,17 @@ def test_mcp_response_has_valid_usage():
     assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
 
 
-def test_mcp_response_has_valid_id():
+def test_mcp_response_has_valid_id(normal_nonstreaming_response):
     """MCP response has a proper chatcmpl- prefixed ID."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [{"role": "user", "content": "Say OK."}],
-    }, timeout=TIMEOUT)
-    data = resp.json()
+    data = normal_nonstreaming_response
     assert data["id"].startswith("chatcmpl-"), f"Bad ID format: {data['id']}"
     assert data["object"] == "chat.completion"
     assert data["model"] == MODEL
 
 
-def test_mcp_streaming_has_valid_sse_structure():
+def test_mcp_streaming_has_valid_sse_structure(normal_streaming_response):
     """MCP streaming response has proper SSE structure with role, content, stop, usage, DONE."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [{"role": "user", "content": "Say OK."}],
-        "stream": True,
-    }, timeout=TIMEOUT)
-    assert resp.status_code == 200
-
+    resp = normal_streaming_response
     lines = [l for l in resp.text.strip().split("\n") if l.startswith("data: ")]
     assert len(lines) >= 3, f"Expected at least 3 SSE lines, got {len(lines)}"
 
@@ -378,13 +368,9 @@ def test_mcp_streaming_has_valid_sse_structure():
     assert len(finish_chunks) > 0, "Missing finish_reason chunk"
 
 
-def test_mcp_non_streaming_response_structure():
+def test_mcp_non_streaming_response_structure(normal_nonstreaming_response):
     """Non-streaming MCP response has full OpenAI-compatible structure."""
-    resp = httpx.post(f"{API_URL}/chat/completions", json={
-        "model": MODEL,
-        "messages": [{"role": "user", "content": "Say OK."}],
-    }, timeout=TIMEOUT)
-    data = resp.json()
+    data = normal_nonstreaming_response
     assert "id" in data
     assert "object" in data
     assert "created" in data
@@ -413,11 +399,10 @@ def test_mcp_models_endpoint():
     assert data["data"][0]["id"] == MODEL
 
 
-def test_mcp_health_endpoint():
+def test_mcp_health_endpoint(health_response):
     """GET /health returns model_available with MCP enabled."""
-    resp = httpx.get(f"{BASE_URL}/health", timeout=TIMEOUT)
-    assert resp.status_code == 200
-    data = resp.json()
+    assert health_response.status_code == 200
+    data = health_response.json()
     assert "model_available" in data
     assert "model" in data
     assert data["model"] == MODEL

@@ -27,7 +27,7 @@ apfel --serve
 ```
 
 ```
-apfel server v0.6.23
+apfel server
 ├ endpoint: http://127.0.0.1:11434
 ├ cors:     disabled
 ├ origin:   localhost only (http://127.0.0.1, http://localhost, http://[::1])

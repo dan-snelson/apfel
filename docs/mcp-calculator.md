@@ -92,7 +92,7 @@ apfel --mcp ./calc.py "What is 15 times 27?"
 6. tools/call via MCP -> result: 20501
   |
   v
-7. Re-prompt model (without tools) with the result
+7. Re-prompt model with full conversation context + tool result
 8. Model answers: "15 times 27 is 405."
 ```
 
@@ -100,11 +100,10 @@ apfel --mcp ./calc.py "What is 15 times 27?"
 
 When running `apfel --serve --mcp ./calc.py`, the server auto-injects MCP tools for clients that don't send their own:
 
-- Client sends tools -> client's tools used (standard OpenAI behavior)
-- Client sends NO tools -> MCP tools injected, model can call them
-- Server returns `finish_reason: "tool_calls"` to the client (the client handles execution)
+- Client sends tools -> client's tools used, returned as `finish_reason: "tool_calls"` (standard OpenAI behavior, client handles execution)
+- Client sends NO tools -> MCP tools injected, server auto-executes tool calls and returns the final text answer with `finish_reason: "stop"`
 
-This keeps the server OpenAI API compliant. Any SDK works.
+MCP auto-execution preserves full conversation context: the server appends the tool call and result as proper `assistant`/`tool` messages before re-prompting, so multi-turn conversations work correctly.
 
 ## Build your own MCP server
 

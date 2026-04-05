@@ -4,7 +4,7 @@
 
 ```bash
 brew tap Arthur-Ficial/tap
-brew install Arthur-Ficial/tap/apfel
+brew install apfel
 ```
 
 Verify the install:

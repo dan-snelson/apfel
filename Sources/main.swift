@@ -263,15 +263,11 @@ while i < args.count {
 
     case "--retry":
         cliRetryEnabled = true
-
-    case "--retry-count":
-        i += 1
-        guard i < args.count, let n = Int(args[i]), n > 0 else {
-            printError("--retry-count requires a positive number (default: 3)")
-            exit(exitUsageError)
+        // Optional argument: --retry or --retry N
+        if i + 1 < args.count, let n = Int(args[i + 1]), n > 0 {
+            cliRetryCount = n
+            i += 1
         }
-        cliRetryCount = n
-        cliRetryEnabled = true  // --retry-count implies --retry
 
     case "--context-strategy":
         i += 1

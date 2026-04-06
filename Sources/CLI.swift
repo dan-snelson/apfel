@@ -451,8 +451,7 @@ func printUsage() {
           --max-tokens <n>       Maximum response tokens
           --mcp <path>           Attach MCP tool server (repeatable)
           --permissive           Use permissive content guardrails
-          --retry                Enable retry with exponential backoff on transient errors
-          --retry-count <n>      Max retry attempts [default: 3, implies --retry]
+          --retry [n]            Enable retry with exponential backoff [default: 3 retries]
           --model-info           Print model capabilities and exit
           --benchmark            Run internal performance benchmarks
           --update               Check for updates and upgrade via Homebrew

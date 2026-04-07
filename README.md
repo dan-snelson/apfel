@@ -158,42 +158,22 @@ make benchmark
 
 ### File attachments (`-f/--file`)
 
-Attach one or more files to any prompt with `-f`. File contents are prepended to your prompt text. The flag is repeatable - use it as many times as you need.
+Attach files to any prompt with `-f` (repeatable). Contents are prepended to your prompt.
 
 ```bash
-# Explain a file
 apfel -f main.swift "Explain what this code does"
-
-# Compare two files
 apfel -f before.txt -f after.txt "What are the differences?"
-
-# Code review a git diff
-jj diff | apfel -f CONVENTIONS.md "Review this diff against our coding conventions"
 git diff HEAD~1 | apfel -f style-guide.md "Any style violations in this diff?"
-
-# Summarize a commit
-git show HEAD | apfel -f CHANGELOG.md "Write a changelog entry for this commit"
-
-# Combine with other flags
 apfel -f data.csv -o json "Extract the top 5 rows" | jq .content
-apfel -f code.py -s "You are a senior code reviewer" "Find bugs"
-apfel -f spec.md --stream "Generate test cases for this spec"
 ```
 
-Files, stdin, and prompt arguments all compose naturally:
+Files, stdin, and prompt arguments all compose:
 
 ```bash
-# File only (file content becomes the prompt)
-apfel -f poem.txt
-
-# File + prompt argument
-apfel -f poem.txt "Translate this to German"
-
-# Stdin + prompt argument
-echo "some text" | apfel "Summarize this"
-
-# File + stdin + prompt argument (all three combined)
-echo "extra context" | apfel -f code.swift "Explain this code with the context above"
+apfel -f poem.txt                                    # file only
+apfel -f poem.txt "Translate this to German"          # file + prompt
+echo "some text" | apfel "Summarize this"             # stdin + prompt
+echo "ctx" | apfel -f code.swift "Explain with context" # all three
 ```
 
 ## Demos
@@ -253,14 +233,11 @@ Also in `demo/`:
 
 ```bash
 brew install Arthur-Ficial/tap/apfel-gui
-apfel-gui
 ```
 
 ![apfel GUI](screenshots/gui-chat.png)
 
-Native macOS SwiftUI app for debugging and chatting with Apple Intelligence. Debug inspector with full request/response timeline, MCP JSON-RPC protocol viewer, live request logs, model settings, speech-to-text, text-to-speech - all on-device.
-
-**[Full documentation and features in the apfel-gui repo ->](https://github.com/Arthur-Ficial/apfel-gui)**
+Native SwiftUI debug inspector with request timeline, MCP protocol viewer, chat, TTS/STT - all on-device. **[apfel-gui repo ->](https://github.com/Arthur-Ficial/apfel-gui)**
 
 ## MCP Tool Support
 
@@ -276,20 +253,15 @@ tool: multiply({"a": 15, "b": 27}) = 405                                        
 15 times 27 is 405.                                                                ← stdout
 ```
 
-Tool discovery and call info goes to stderr (visible in terminal, invisible when piped). Only the answer goes to stdout. Use `-q` to suppress tool info entirely.
+Tool info goes to stderr; only the answer goes to stdout. Use `-q` to suppress tool info.
 
 ```bash
-# Multiple MCP servers (bring your own)
-apfel --mcp ./server_a.py --mcp ./server_b.py "Use both tools"
-
-# Server mode - tools auto-available to all clients
-apfel --serve --mcp ./mcp/calculator/server.py
-
-# No --mcp = exactly as before. Zero overhead.
-apfel "What is 2+2?"
+apfel --mcp ./server_a.py --mcp ./server_b.py "Use both tools"  # multiple servers
+apfel --serve --mcp ./mcp/calculator/server.py                   # server mode
+apfel --chat --mcp ./mcp/calculator/server.py                    # chat mode
 ```
 
-Ships with a calculator MCP server at `mcp/calculator/`. See [MCP docs](docs/mcp-calculator.md) for details and how to build your own.
+Ships with a calculator MCP server at `mcp/calculator/`. See [MCP docs](docs/mcp-calculator.md) for details.
 
 ## OpenAI API Compatibility
 
@@ -300,9 +272,8 @@ Ships with a calculator MCP server at `mcp/calculator/`. See [MCP docs](docs/mcp
 | `POST /v1/chat/completions` | Supported | Streaming + non-streaming |
 | `GET /v1/models` | Supported | Returns `apple-foundationmodel` |
 | `GET /health` | Supported | Model availability, context window, languages |
-| `GET /v1/logs` | Debug only | Available only when server starts with `--debug` |
-| `GET /v1/logs/stats` | Debug only | Available only when server starts with `--debug` |
-| Tool calling | Supported | Native `Transcript.ToolDefinition` + JSON detection. See [Tool Calling Guide](docs/tool-calling-guide.md) |
+| `GET /v1/logs`, `/v1/logs/stats` | Debug only | Requires `--debug` |
+| Tool calling | Supported | Native `ToolDefinition` + JSON detection. See [Tool Calling Guide](docs/tool-calling-guide.md) |
 | `response_format: json_object` | Supported | Via system prompt injection |
 | `temperature`, `max_tokens`, `seed` | Supported | Mapped to `GenerationOptions` |
 | `stream: true` | Supported | SSE with usage stats in final chunk |
@@ -322,13 +293,12 @@ Full API spec: [openai/openai-openapi](https://github.com/openai/openai-openapi)
 
 | Constraint | Detail |
 |------------|--------|
-| Context window | **4096 tokens** (input + output combined). ~3000 English words. |
+| Context window | **4096 tokens** (input + output combined) |
 | Platform | macOS 26+, Apple Silicon only |
 | Model | One model (`apple-foundationmodel`), not configurable |
-| Guardrails | Apple's safety system may block benign prompts (false positives exist) |
-| Speed | On-device inference, not cloud-scale - expect a few seconds per response |
-| No embeddings | Apple's model doesn't support vector embeddings |
-| No vision | Image/multi-modal input not supported |
+| Guardrails | Apple's safety system may block benign prompts |
+| Speed | On-device, not cloud-scale - a few seconds per response |
+| No embeddings / vision | Not available on-device |
 
 ## CLI Reference
 
@@ -402,113 +372,91 @@ apfel --system-file persona.txt "Introduce yourself"
 apfel --mcp ./mcp/calculator/server.py "What is 15 times 27?"
 apfel --mcp ./calc.py --mcp ./weather.py "Use both tools"
 
-# -o, --output — output format: plain (default) or json
+# -f, --file
+apfel -f main.swift "Explain this code"
+apfel -f before.txt -f after.txt "What changed?"
+
+# -s, --system
+apfel -s "You are a pirate" "What is recursion?"
+
+# --system-file
+apfel --system-file persona.txt "Introduce yourself"
+
+# --mcp
+apfel --mcp ./mcp/calculator/server.py "What is 15 times 27?"
+apfel --mcp ./calc.py --mcp ./weather.py "Use both tools"
+
+# -o, --output
 apfel -o json "Translate to German: hello" | jq .content
-apfel -o json "List 3 facts" | jq -r .content
 
-# -q, --quiet — suppress headers and chrome, output only
+# -q, --quiet
 apfel -q "Give me a UUID"
-apfel -q -o json "Summarize" | jq .content
 
-# --no-color — disable ANSI color codes
-apfel --no-color --help
+# --no-color
 NO_COLOR=1 apfel "Hello"
 
-# --temperature — sampling temperature (higher = more creative)
+# --temperature
 apfel --temperature 0.0 "What is 2+2?"
 apfel --temperature 1.5 "Write a wild poem"
 
-# --seed — random seed for reproducible output
+# --seed
 apfel --seed 42 "Tell me a joke"
-apfel --seed 42 "Tell me a joke"   # same output
 
-# --max-tokens — limit response length
+# --max-tokens
 apfel --max-tokens 50 "Explain quantum computing"
-apfel --max-tokens 10 "Say something short"
 
-# --permissive — relax content guardrails
+# --permissive
 apfel --permissive "Write a villain monologue"
 
-# --retry — retry transient errors with exponential backoff
+# --retry
 apfel --retry "What is 2+2?"
 
-# --debug — verbose debug logging to stderr
+# --debug
 apfel --debug "Hello world"
 
-# --stream — stream response tokens as they arrive
+# --stream
 apfel --stream "Write a haiku about code"
-apfel --stream -s "Be verbose" "Explain TCP"
 
-# --chat — interactive multi-turn conversation
+# --chat
 apfel --chat
 apfel --chat -s "You are a helpful coding assistant"
 
-# --context-strategy — how to handle context overflow in chat
-apfel --chat --context-strategy newest-first      # default: keep recent turns
-apfel --chat --context-strategy oldest-first      # keep earliest turns
+# --context-strategy
+apfel --chat --context-strategy newest-first      # default
 apfel --chat --context-strategy sliding-window --context-max-turns 6
 apfel --chat --context-strategy summarize          # compress old turns
-apfel --chat --context-strategy strict             # error on overflow
 
-# --context-max-turns — max turns to keep (sliding-window only)
-apfel --chat --context-strategy sliding-window --context-max-turns 4
-
-# --context-output-reserve — tokens reserved for model response
-apfel --chat --context-output-reserve 256
-
-# --serve — start OpenAI-compatible HTTP server
+# --serve
 apfel --serve
 apfel --serve --port 3000 --host 0.0.0.0
 
-# --port, --host — server bind address
-apfel --serve --port 8080
-apfel --serve --host 0.0.0.0 --port 443
-
-# --cors — enable CORS for browser clients
+# --cors, --token, --footgun
 apfel --serve --cors
-
-# --allowed-origins — restrict to specific origins
-apfel --serve --allowed-origins "https://myapp.com,https://staging.myapp.com"
-
-# --no-origin-check — allow requests from any origin
-apfel --serve --no-origin-check
-
-# --token — require Bearer token authentication
 apfel --serve --token "my-secret-token"
-curl localhost:11434/v1/models -H "Authorization: Bearer my-secret-token"
-
-# --token-auto — generate a random token and print it
-apfel --serve --token-auto
-
-# --public-health — keep /health open even with token auth
-apfel --serve --token "secret" --host 0.0.0.0 --public-health
-
-# --footgun — disable all protections (CORS + no origin check)
 apfel --serve --footgun   # only for local development!
 
-# --max-concurrent — limit parallel model requests
+# --token-auto, --public-health
+apfel --serve --token-auto --host 0.0.0.0 --public-health
+
+# --allowed-origins, --no-origin-check
+apfel --serve --allowed-origins "https://myapp.com,https://staging.myapp.com"
+apfel --serve --no-origin-check
+
+# --max-concurrent
 apfel --serve --max-concurrent 2
 
-# --debug — in server mode, also enables /v1/logs endpoints
+# --debug (server: also enables /v1/logs)
 apfel --serve --debug
 
-# --benchmark — run internal performance benchmarks
-apfel --benchmark
+# --context-output-reserve
+apfel --chat --context-output-reserve 256
+
+# --benchmark, --model-info, --update, --release, --version, --help
 apfel --benchmark -o json | jq '.benchmarks[] | {name, speedup_ratio}'
-
-# --model-info — print model capabilities
 apfel --model-info
-
-# --update — check for updates and upgrade via Homebrew
 apfel --update
-
-# --release — detailed version and build info
 apfel --release
-
-# --version
 apfel --version
-
-# --help
 apfel --help
 ```
 
@@ -552,48 +500,31 @@ HTTP Server (/v1/*) ───────┘   (100% on-device, zero network)
                                 TokenCounter → real token counts (SDK 26.4)
 ```
 
-Built with Swift 6.3 strict concurrency. Single `Package.swift`, three targets:
-- `ApfelCore` - pure logic library (no FoundationModels dependency, unit-testable)
-- `apfel` - executable (CLI + server)
-- `apfel-tests` - unit tests (pure Swift runner, no XCTest)
-
-**No Xcode required.** Builds and tests with Command Line Tools only.
+Swift 6.3 strict concurrency. Three targets: `ApfelCore` (pure logic, unit-testable), `apfel` (CLI + server), `apfel-tests` (pure Swift runner, no XCTest). **No Xcode required.**
 
 ## Build & Test
 
 ```bash
-# Build + install (auto-bumps patch version each time)
 make install                             # build release + install to /usr/local/bin
-make build                               # build release only (no install)
-
-# Version management (zero manual editing)
+make build                               # build release only
 make version                             # print current version
 make release-minor                       # bump minor: 0.6.x -> 0.7.0
-make release-major                       # bump major: 0.x.y -> 1.0.0
-
-# Debug build (no version bump, uses swift directly)
-swift build                              # quick debug build
-
-# Tests
-swift run apfel-tests                    # pure Swift unit tests (no XCTest needed)
+swift build                              # quick debug build (no version bump)
+swift run apfel-tests                    # unit tests
 python3 -m pytest Tests/integration/ -v  # integration tests (auto-starts servers)
-apfel --benchmark -o json                # performance report from the installed binary
-make benchmark                           # same benchmark via Makefile
+apfel --benchmark -o json                # performance report
 ```
 
-Every `make build`/`make install` automatically:
-- Bumps the patch version (`.version` file is the single source of truth)
-- Updates the README version badge
-- Generates build metadata (commit, date, Swift version) viewable via `apfel --release`
+Every `make build`/`make install` auto-bumps the patch version, updates the README badge, and generates build metadata (`.version` is the single source of truth).
 
 ## Related Projects
 
-- [apfel-clip](https://github.com/Arthur-Ficial/apfel-clip) - AI-powered clipboard actions from the menu bar (fix grammar, translate, explain code, and more)
-- [apfel-gui](https://github.com/Arthur-Ficial/apfel-gui) - Native macOS SwiftUI debug GUI for apfel (debug inspector, MCP protocol viewer, request logs, chat, TTS/STT)
+- [apfel-clip](https://github.com/Arthur-Ficial/apfel-clip) - AI clipboard actions from the menu bar
+- [apfel-gui](https://github.com/Arthur-Ficial/apfel-gui) - Native macOS debug GUI (inspector, MCP viewer, TTS/STT)
 
 ## Examples
 
-See [docs/EXAMPLES.md](docs/EXAMPLES.md) for 50 real prompts and unedited model outputs.
+See [docs/EXAMPLES.md](docs/EXAMPLES.md) for 50+ real prompts with unedited model output.
 
 ## License
 

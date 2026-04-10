@@ -524,6 +524,14 @@ def test_completions_501_schema():
     validate(instance=resp.json(), schema=ERROR_RESPONSE_SCHEMA)
 
 
+def test_responses_501_schema():
+    """/v1/responses 501 response matches error schema."""
+    resp = httpx.post(f"{BASE_URL}/v1/responses",
+                      json={"model": MODEL, "input": "hi"}, timeout=10)
+    assert resp.status_code == 501
+    validate(instance=resp.json(), schema=ERROR_RESPONSE_SCHEMA)
+
+
 def test_embeddings_501_schema():
     """/v1/embeddings 501 response matches error schema."""
     resp = httpx.post(f"{BASE_URL}/v1/embeddings",

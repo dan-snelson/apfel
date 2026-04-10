@@ -191,6 +191,9 @@ func startServer(config: ServerConfig, mcpManager: MCPManager? = nil) async thro
     }
 
     // Stub endpoints - honest about unsupported features
+    router.post("/v1/responses") { _, _ -> Response in
+        openAIError(status: .init(code: 501), message: "Responses API not supported. Use /v1/chat/completions.", type: "invalid_request_error")
+    }
     router.post("/v1/completions") { _, _ -> Response in
         openAIError(status: .init(code: 501), message: "Text completions not supported. Use /v1/chat/completions.", type: "invalid_request_error")
     }

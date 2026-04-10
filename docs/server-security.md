@@ -70,6 +70,8 @@ curl -H "Origin: http://localhost.evil.com" http://localhost:11434/v1/models
 
 **What this means:** Out of the box, your server is protected from cross-site attacks. curl, SDKs, and scripts work unchanged. Local browser apps can send requests and read simple GET responses. For full browser support (POST, custom headers), add `--cors`.
 
+OpenAI SDK note: use `chat.completions.create(...)` against `http://localhost:11434/v1`. `apfel` does not implement `/v1/responses`. See [docs/openai-sdk.md](docs/openai-sdk.md) for full examples.
+
 ---
 
 ## Security flags reference

@@ -18,7 +18,7 @@ Every Mac with Apple Silicon has a **built-in LLM** - Apple's on-device foundati
 
 - **UNIX tool** - `echo "summarize this" | apfel` - pipe-friendly, file attachments, JSON output, exit codes
 - **Interactive chat** - `apfel --chat` - multi-turn conversation with context window management
-- **OpenAI-compatible server** - `apfel --serve` - drop-in replacement at `localhost:11434`, works with any OpenAI SDK
+- **OpenAI-compatible server** - `apfel --serve` - drop-in replacement at `localhost:11434` for Chat Completions-compatible OpenAI SDK clients
 - **Tool calling** - function calling with schema conversion, full round-trip support
 - **Zero cost** - no API keys, no cloud, no subscriptions, 4096-token context window
 - **GUI apps** - chat client [apfel-chat](https://apfel-chat.franzai.com) ([gh](https://github.com/Arthur-Ficial/apfel-chat)), clipboard actions [apfel-clip](https://apfel-clip.franzai.com) ([gh](https://github.com/Arthur-Ficial/apfel-clip)), debug inspector [apfel-gui](https://github.com/Arthur-Ficial/apfel-gui) ([gh](https://github.com/Arthur-Ficial/apfel-gui))
@@ -110,7 +110,7 @@ curl http://localhost:11434/v1/chat/completions \
   -d '{"model":"apple-foundationmodel","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
-Works with the official Python client:
+Use Chat Completions with the official Python client:
 
 ```python
 from openai import OpenAI
@@ -122,6 +122,8 @@ resp = client.chat.completions.create(
 )
 print(resp.choices[0].message.content)
 ```
+
+More local SDK examples, including Node.js and browser `fetch()`: [docs/openai-sdk.md](docs/openai-sdk.md)
 
 Run in background (auto-restarts, starts at login - [docs/background-service.md](docs/background-service.md)):
 
@@ -279,9 +281,12 @@ Ships with a calculator MCP server at `mcp/calculator/`. See [docs/mcp-calculato
 
 **Base URL:** `http://localhost:11434/v1`
 
+Use OpenAI SDKs against Chat Completions. `apfel` does **not** implement the newer Responses API.
+
 | Feature | Status | Notes |
 |---------|--------|-------|
 | `POST /v1/chat/completions` | Supported | Streaming + non-streaming |
+| `POST /v1/responses` | 501 | Not implemented. Use `/v1/chat/completions` |
 | `GET /v1/models` | Supported | Returns `apple-foundationmodel` |
 | `GET /health` | Supported | Model availability, context window, languages |
 | `GET /v1/logs`, `/v1/logs/stats` | Debug only | Requires `--debug` |

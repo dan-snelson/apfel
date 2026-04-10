@@ -1,7 +1,8 @@
 """
 apfel Integration Tests — OpenAI Python Client E2E
 
-Validates that apfel's OpenAI-compatible server works with the real `openai` library.
+Validates that apfel's OpenAI-compatible server works with the real `openai` library
+for Chat Completions-compatible usage.
 Requires: pip install openai pytest httpx
 Requires: apfel --serve running on localhost:11434
 
@@ -214,6 +215,14 @@ def test_completions_stub_501():
     resp = httpx.post(f"{BASE_URL.replace('/v1', '')}/v1/completions",
                       json={"model": MODEL, "prompt": "hi"})
     assert resp.status_code == 501
+
+
+def test_responses_stub_501():
+    """/v1/responses returns 501 Not Implemented with Chat Completions guidance."""
+    resp = httpx.post(f"{BASE_URL.replace('/v1', '')}/v1/responses",
+                      json={"model": MODEL, "input": "hi"})
+    assert resp.status_code == 501
+    assert "/v1/chat/completions" in resp.text
 
 
 def test_embeddings_stub_501():

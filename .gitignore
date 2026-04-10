@@ -8,3 +8,7 @@ DerivedData/
 .wrangler/
 __pycache__/
 .notes/
+
+# Local Development Files
+.codex
+.envrc

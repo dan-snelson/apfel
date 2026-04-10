@@ -14,7 +14,7 @@ No API keys. No cloud. No subscriptions. No per-token billing. The AI is already
 
 ## What is this
 
-Every Mac with Apple Silicon has a **built-in LLM** - Apple's on-device foundation model, shipped as part of Apple Intelligence. Apple provides the [FoundationModels framework](https://developer.apple.com/documentation/foundationmodels) (macOS 26+) to access it, but only exposes it through Siri and system features. **apfel wraps it** in a CLI and an HTTP server - so you can actually use it. All inference runs **on-device**, no network calls.
+Every Mac with Apple Silicon has a **built-in LLM** - Apple's on-device foundation model, shipped as part of Apple Intelligence. Apple provides the [FoundationModels framework](https://developer.apple.com/documentation/foundationmodels) (macOS 26+) to access it, but only exposes it through Siri and system features. **apfel wraps it** in a CLI and an HTTP server - so you can actually use it. All **inference** runs on-device with no network calls for the LLM itself. Optional remote MCP tool servers (`--mcp https://...`) do make network calls for tool arguments — see [MCP Tool Support](#mcp-tool-support).
 
 - **UNIX tool** - `echo "summarize this" | apfel` - pipe-friendly, file attachments, JSON output, exit codes
 - **Interactive chat** - `apfel --chat` - multi-turn conversation with context window management
@@ -275,6 +275,22 @@ apfel --chat --mcp ./mcp/calculator/server.py                    # chat mode
 
 Ships with a calculator MCP server at `mcp/calculator/`. See [docs/mcp-calculator.md](docs/mcp-calculator.md) for details.
 
+**Remote MCP servers** (Streamable HTTP transport, MCP spec 2025-03-26):
+
+```bash
+# Remote MCP server over HTTPS
+apfel --mcp https://mcp.example.com/v1 "what tools do you have?"
+
+# With bearer token auth - prefer the env var (flag is visible in ps aux)
+APFEL_MCP_TOKEN=mytoken apfel --mcp https://mcp.example.com/v1 "..."
+apfel --mcp https://mcp.example.com/v1 --mcp-token mytoken "..."
+
+# Mixed local + remote
+apfel --mcp /path/to/local.py --mcp https://remote.example.com/v1 "..."
+```
+
+> **Security:** Use `APFEL_MCP_TOKEN` env var rather than `--mcp-token` — CLI flags are visible in `ps aux`. apfel refuses to send a bearer token over plaintext `http://` (use `https://`).
+
 ## OpenAI API Compatibility
 
 **Base URL:** `http://localhost:11434/v1`
@@ -502,7 +518,8 @@ See [docs/server-security.md](docs/server-security.md) for detailed documentatio
 | `APFEL_CONTEXT_STRATEGY` | Default context strategy |
 | `APFEL_CONTEXT_MAX_TURNS` | Max turns for sliding-window |
 | `APFEL_CONTEXT_OUTPUT_RESERVE` | Tokens reserved for output |
-| `APFEL_MCP` | MCP server paths (colon-separated) |
+| `APFEL_MCP` | MCP server paths — colon-separated for local paths, comma-separated for mixed local+remote URLs |
+| `APFEL_MCP_TOKEN` | Bearer token for remote HTTP MCP servers (preferred over `--mcp-token`; not visible in `ps aux`) |
 | `APFEL_MCP_TIMEOUT` | MCP timeout in seconds (default: 5, max: 300) |
 | `NO_COLOR` | Disable colors ([no-color.org](https://no-color.org)) |
 

@@ -17,9 +17,12 @@ No API keys. No cloud. No subscriptions. No per-token billing. The AI is already
 Every Mac with Apple Silicon has a **built-in LLM** - Apple's on-device foundation model, shipped as part of Apple Intelligence. Apple provides the [FoundationModels framework](https://developer.apple.com/documentation/foundationmodels) (macOS 26+) to access it, but only exposes it through Siri and system features. **apfel wraps it** in a CLI and an HTTP server - so you can actually use it. All inference runs **on-device**, no network calls.
 
 - **UNIX tool** - `echo "summarize this" | apfel` - pipe-friendly, file attachments, JSON output, exit codes
+- **Interactive chat** - `apfel --chat` - multi-turn conversation with context window management
 - **OpenAI-compatible server** - `apfel --serve` - drop-in replacement at `localhost:11434`, works with any OpenAI SDK
 - **Tool calling** - function calling with schema conversion, full round-trip support
 - **Zero cost** - no API keys, no cloud, no subscriptions, 4096-token context window
+
+*Prefer a GUI? [apfel-chat](https://apfel-chat.franzai.com) (chat client) ([gh](https://github.com/Arthur-Ficial/apfel-chat)), [apfel-clip](https://apfel-clip.franzai.com) (clipboard actions) ([gh](https://github.com/Arthur-Ficial/apfel-clip)), [apfel-gui](https://apfel-gui.franzai.com) (debug inspector) ([gh](https://github.com/Arthur-Ficial/apfel-gui)).*
 
 ![apfel CLI](screenshots/cli.png)
 

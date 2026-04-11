@@ -54,22 +54,6 @@ make install
 
 Troubleshooting: [docs/install.md](docs/install.md)
 
-### "Model unavailable" — why and how to fix
-
-If `apfel --model-info` shows `available: no`, the specific reason is now printed alongside it. There are three possible causes, all from Apple's FoundationModels framework:
-
-| Reason | What it means | Fix |
-|---|---|---|
-| **Apple Intelligence not enabled** | The toggle is off, or your device language and Siri language do not match, or Siri is set to an unsupported language | **System Settings > Apple Intelligence & Siri** → turn on. Ensure **Device Language** and **Siri Language** are set to the SAME supported language (English, Danish, Dutch, French, German, Italian, Norwegian, Portuguese, Spanish, Swedish, Turkish, Chinese Simplified/Traditional, Japanese, Korean, Vietnamese). |
-| **Device not eligible** | Intel Mac, or Mac older than M1 | Apple Silicon (M1 or later) is required. This is a hard Apple requirement - there is no workaround. |
-| **Model not ready** | On-device model is still downloading (~3-4 GB on first enable) | Keep your Mac on **Wi-Fi and power**. Check download progress in System Settings > Apple Intelligence & Siri. Try again in a few minutes. |
-
-apfel is a thin wrapper around Apple's on-device model — it cannot turn on Apple Intelligence for you. Once the underlying Apple toggle is on and models are downloaded, apfel just works.
-
-Apple's full Apple Intelligence setup guide: [support.apple.com/en-us/121115](https://support.apple.com/en-us/121115)
-
-Geographic note: Apple Intelligence is blocked in **China mainland** (both device purchase location and Apple Account Country/Region matter). Hong Kong, EU, and most other regions are supported as of macOS 26.1.
-
 ## Quick Start
 
 ### UNIX tool

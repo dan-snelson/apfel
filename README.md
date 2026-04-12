@@ -313,7 +313,7 @@ python3 -m pytest Tests/integration/ -v  # integration tests
 apfel --benchmark -o json                # performance report
 ```
 
-Every `make build`/`make install` auto-bumps the patch version, updates the README badge, and generates build metadata. `.version` is the single source of truth.
+`.version` is the single source of truth. Only `make release` (via CI) bumps versions. Local builds do not change the version.
 
 ## The apfel tree
 
@@ -324,7 +324,7 @@ Everything that grows out of apfel. Each project ships as its own repo, its own 
 - **apfel** — on-device Apple FoundationModels CLI and OpenAI-compatible server. The root of the tree; every other project uses it for inference.
   - Site: [https://apfel.franzai.com](https://apfel.franzai.com)
   - Repo: [https://github.com/Arthur-Ficial/apfel](https://github.com/Arthur-Ficial/apfel)
-  - Install: `brew install Arthur-Ficial/tap/apfel`
+  - Install: `brew tap Arthur-Ficial/tap && brew install apfel`
 
 ### Apps
 

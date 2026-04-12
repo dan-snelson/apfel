@@ -27,7 +27,7 @@ cd apfel
 make install
 ```
 
-`make install` auto-bumps the version, builds a release binary, and installs to `/usr/local/bin/apfel`.
+`make install` builds a release binary and installs to `/usr/local/bin/apfel`.
 
 ### Verify your toolchain
 

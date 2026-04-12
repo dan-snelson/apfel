@@ -61,35 +61,24 @@ HTTP Server (/v1/*) ───────┘   ContextManager → Transcript API
 
 ## Current Status
 
-- Version source of truth: `.version` (currently `0.9.0`)
-- Tests: `203` unit + `174` integration (full suite ~90 seconds)
-- Issues `#33` through `#45` addressed
-- v0.9.0: The Unification Refactor
-  - Shared `processPrompt()` eliminates 5 duplicated code blocks between `singlePrompt()` and `chat()`
-  - Chat+MCP crash fixed (#43): session created without requiring user message at init
-  - `--debug` flag works in all modes (CLI, chat, server) - debug output to stderr (#44)
-  - Ctrl-C exits chat cleanly (SIGINT handled via C shim around libedit)
-  - Missing `ApfelError` cases: `unsupportedGuide`, `decodingFailure` (#41)
-  - Context rotation bug fixed: MCP tools re-injected after rotation
-  - Summarizer uses `makeModel(permissive:)` instead of `SystemLanguageModel.default`
-  - Dead code removed: `sseStopChunk()`, `buildSystemPrompt()`, `formatToolResult()`
-  - Homebrew formula: ARM check moved from hard error to caveats warning (#45)
-  - 35 new chat integration tests (startup, exit, MCP, debug, JSON, Ctrl-C, multi-turn)
-  - Integration test conftest auto-starts servers
+- Version: `1.0.0` (source of truth: `.version`)
+- Tests: 335 unit + 216 integration
+- Distribution: Homebrew tap (`brew tap Arthur-Ficial/tap && brew install apfel`), homebrew-core pending
+- Stability policy: [STABILITY.md](STABILITY.md)
+- Security policy: [SECURITY.md](SECURITY.md)
 
 ## Build & Test
 
 ```bash
-make install                   # bump patch + build release + install to /usr/local/bin
-make build                     # bump patch + build release
-make release-minor             # bump minor (0.6.x -> 0.7.0) + build
-make release-major             # bump major (0.x.y -> 1.0.0) + build
+make install                   # build release + install to /usr/local/bin (NO version bump)
+make build                     # build release only (NO version bump)
 make version                   # print current version
-swift build                    # debug build (uses "dev" version stub)
-swift run apfel-tests          # run pure Swift unit tests
+swift build                    # debug build
+swift run apfel-tests          # unit tests (335 tests)
+make preflight                 # full release qualification (unit + integration + policy checks)
 ```
 
-**Version is in `.version` file** (single source of truth). Every `make build`/`make install` auto-bumps the patch number, updates README badge, and generates `Sources/BuildInfo.swift`. **Never manually edit `.version`, `BuildInfo.swift`, or the README badge** - always use `make build` which updates all three atomically.
+**Version is in `.version` file** (single source of truth). Local builds (`make build`, `make install`) do NOT change the version. Only the release workflow (`make release`) bumps versions. This ensures patch versions mean "published compatible fix", not "someone ran a build". **Never manually edit `.version`, `BuildInfo.swift`, or the README badge** - these are updated atomically by the release workflow.
 
 **Always use `make install` for testing changes** - `swift run` uses a debug build, and the installed binary at `/usr/local/bin/apfel` won't reflect your changes until you run `make install`.
 
@@ -121,10 +110,10 @@ bash scripts/generate-examples.sh          # ~2 minutes, overwrites docs/EXAMPLE
 | Security | `Sources/Core/OriginValidator.swift`, `Sources/SecurityMiddleware.swift` |
 | MCP client | `Sources/Core/MCPProtocol.swift`, `Sources/MCPClient.swift` |
 | MCP calculator | `mcp/calculator/server.py` |
-| Tests | `Tests/apfelTests/` (188 unit), `Tests/integration/` (139 integration) |
+| Tests | `Tests/apfelTests/` (335 unit), `Tests/integration/` (216 integration) |
 | Tickets | `open-tickets/` |
 | Docs | `docs/` (brew-install, EXAMPLES, release, tool-calling-guide) |
-| Scripts | `scripts/generate-examples.sh` (regenerates docs/EXAMPLES.md), `scripts/write-homebrew-formula.sh` |
+| Scripts | `scripts/generate-examples.sh`, `scripts/write-homebrew-formula.sh`, `scripts/release-preflight.sh`, `scripts/post-release-verify.sh` |
 
 ## Handling GitHub Issues
 
@@ -266,61 +255,84 @@ Do not approve code PRs with P0 findings. For docs-only PRs, a request-changes o
 - `URLSession.shared` for new network code (shared cookie jar, shared cache)
 - Bearer tokens sent over `http://`
 - New `exit()` calls in pure parsing functions
-- Manual edits to `.version`, `README.md` version badge, or `Sources/BuildInfo.swift` (these are `make build` outputs)
+- Manual edits to `.version`, `README.md` version badge, or `Sources/BuildInfo.swift` (these are release workflow outputs)
 - Merge commits in the PR branch history (prefer rebase and squash)
 - Contributor working from their fork's `main` branch instead of a feature branch (cosmetic, but harder to land cleanly)
 
 ## Publishing a Release
 
-**MANDATORY: always use the automated workflow.** No manual releases. No exceptions. One command does everything.
+**MANDATORY: always use the automated workflow.** No manual releases. No exceptions.
+
+### Before releasing
 
 ```bash
-make release                    # patch bump (0.9.17 -> 0.9.18)
-make release TYPE=minor         # minor bump (0.9.x -> 0.10.0)
-make release TYPE=major         # major bump (0.x.y -> 1.0.0)
+make preflight
 ```
 
-This triggers the **Publish Release** GitHub Actions workflow which runs on `macos-26` and does ALL of the following in order, with zero human intervention:
+This runs the full qualification locally: clean git state, on main, unit tests, integration tests (7 suites), policy file checks, version sanity. **Do not release if preflight fails.**
 
-1. Bumps `.version` via `make build` / `make release-minor` / `make release-major`
-2. Builds the release binary
-3. Runs unit tests (`swift run apfel-tests`)
-4. Commits `.version`, `README.md`, `Sources/BuildInfo.swift` and pushes to `main`
-5. Creates a git tag (`v<version>`) and pushes it
-6. Packages `apfel-<version>-arm64-macos.tar.gz` and publishes a GitHub Release
-7. Clones `Arthur-Ficial/homebrew-tap`, regenerates `Formula/apfel.rb` with new URL + SHA256, commits and pushes
-
-After the workflow completes (~3 min), verify locally:
+### Release
 
 ```bash
-brew update && brew upgrade apfel && brew test apfel && apfel --version
+make release                    # patch (1.0.0 -> 1.0.1)
+make release TYPE=minor         # minor (1.0.x -> 1.1.0)
+make release TYPE=major         # major (1.x.y -> 2.0.0)
 ```
 
-**Do NOT manually run `make install`, `make package-release-asset`, `git tag`, `gh release create`, or push to the Homebrew tap.** The workflow does all of it. Manual steps create version drift, duplicate tags, and half-updated taps. If the workflow fails, fix the workflow - don't work around it.
+This dispatches the **Publish Release** GitHub Actions workflow which:
 
-The workflow source is `.github/workflows/publish-release.yml`. The `HOMEBREW_TAP_PUSH_TOKEN` secret must exist on `Arthur-Ficial/apfel` (fine-grained token with Contents R/W on `Arthur-Ficial/homebrew-tap`).
+1. Bumps `.version` (patch/minor/major)
+2. Regenerates `Sources/BuildInfo.swift` and README badge
+3. Builds the release binary
+4. Runs unit tests (335+)
+5. Runs integration tests (7 suites: cli_e2e, performance, openai_client, openapi_spec, security, mcp_server, openapi_conformance)
+6. Commits `.version`, `README.md`, `Sources/BuildInfo.swift` and pushes to `main`
+7. Creates git tag (`v<version>`) and pushes it
+8. Packages tarball and publishes GitHub Release with changelog
+
+### After releasing
+
+```bash
+./scripts/post-release-verify.sh
+```
+
+Verifies: GitHub Release exists with tarball, git tag exists, `.version` matches, installed binary matches.
+
+### Homebrew distribution
+
+apfel is currently distributed through the custom tap (`Arthur-Ficial/homebrew-tap`). The release workflow automatically updates the tap formula.
+
+- Users install: `brew tap Arthur-Ficial/tap && brew install apfel`
+- Users upgrade: `brew upgrade apfel`
+
+**homebrew-core transition:** PR #276365 is pending to add apfel to homebrew-core. Once accepted, install will simplify to `brew install apfel` (no tap needed). The tap will then become a secondary channel for apfel-family tools and pre-release builds. At that point, remove the tap update steps from the publish-release workflow and update all install docs.
+
+### Do NOT manually
+
+- Run `bump-patch`, `bump-minor`, `bump-major` directly
+- Edit `.version`, `BuildInfo.swift`, or README badge
+- Create git tags or run `gh release create`
+- Push to the Homebrew tap manually (the workflow handles it)
 
 ### Integration test rules
 
 - **Never skip tests.** A skipped test is a critical error.
 - Integration tests require two running servers: port 11434 (plain) and port 11435 (with MCP calculator).
 - If servers aren't running, tests skip silently - this is NOT acceptable. Always start them.
-- After releasing, run the full suite against the brew-installed binary as final verification.
 
 ### Post-release checklist
 
-- [ ] Unit tests pass (188+)
-- [ ] Integration tests pass (139+, 0 skipped)
-- [ ] GitHub Release created with tarball
-- [ ] Homebrew tap updated and `brew test` passes
-- [ ] CLAUDE.md test counts and version updated
-- [ ] File a ticket on `Arthur-Ficial/apfel-web` if the landing page shows test counts
+- [ ] `make preflight` passed before release
+- [ ] Publish Release workflow completed green
+- [ ] `./scripts/post-release-verify.sh` passed
+- [ ] CLAUDE.md version and test counts updated (if changed)
+- [ ] File a ticket on `Arthur-Ficial/apfel-web` if the landing page needs update
 
 ## CI / GitHub Actions
 
-- **`macos-26` runner** has Xcode-bundled SDKs (not standalone CLT). The workflow selects the latest available Xcode via `xcode-select` before building.
-- apfel requires **SDK 26.4+** for FoundationModels token-counting APIs (`tokenCount`, `contextSize`). If the runner's highest Xcode is older, the build will fail.
-- **`HOMEBREW_TAP_PUSH_TOKEN`** secret must exist on `Arthur-Ficial/apfel` - fine-grained token with Contents R/W on `Arthur-Ficial/homebrew-tap`.
-- The **Publish Release** workflow (`.github/workflows/publish-release.yml`) is the single source of truth for the release pipeline. It handles version bump, build, test, tag, GitHub Release, and homebrew tap update in one run.
-- The **CI** workflow (`.github/workflows/ci.yml`) runs on PRs and pushes for build + test validation.
-- Release docs: `docs/release.md`
+- `macos-26` runner. Selects latest Xcode automatically.
+- SDK 26.4+ required for FoundationModels token-counting APIs.
+- **CI workflow** (`ci.yml`): build + unit tests + integration tests (6 suites) on every push/PR to main.
+- **Publish Release workflow** (`publish-release.yml`): full qualification (unit + 7 integration suites) + release + GitHub Release. Triggered by `make release`.
+- No secrets required for CI. Release workflow requires `HOMEBREW_TAP_PUSH_TOKEN` (fine-grained token with Contents R/W on `Arthur-Ficial/homebrew-tap`).
+- Release docs: [docs/release.md](docs/release.md)

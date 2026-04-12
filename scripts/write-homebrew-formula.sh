@@ -80,7 +80,7 @@ class Apfel < Formula
   end
 
   test do
-    assert_match "apfel v${version}", shell_output("#{bin}/apfel --version")
+    assert_match "apfel v#{version}", shell_output("#{bin}/apfel --version")
   end
 end
 EOF

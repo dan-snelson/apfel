@@ -2,7 +2,7 @@ PREFIX ?= /usr/local
 BINARY = apfel
 VERSION_FILE = .version
 
-.PHONY: check-toolchain build install uninstall clean bump-patch bump-minor bump-major generate-build-info update-readme version release release-minor release-major package-release-asset print-release-asset print-release-sha256 update-homebrew-formula benchmark
+.PHONY: check-toolchain build install uninstall clean bump-patch bump-minor bump-major generate-build-info update-readme version release release-patch release-minor release-major package-release-asset print-release-asset print-release-sha256 update-homebrew-formula preflight benchmark
 
 # --- Environment checks ---
 
@@ -44,9 +44,9 @@ check-toolchain:
 		exit 1; \
 	fi
 
-# --- Build (auto-bumps patch) ---
+# --- Build ---
 
-build: check-toolchain bump-patch generate-build-info update-readme
+build: check-toolchain generate-build-info
 	swift build -c release
 
 install: build
@@ -85,7 +85,10 @@ bump-major:
 	echo "$$new" > $(VERSION_FILE); \
 	echo "$$v → $$new"
 
-# --- Release targets (bump without extra patch increment) ---
+# --- Release targets (version bump + build, used by CI workflow only) ---
+
+release-patch: check-toolchain bump-patch generate-build-info update-readme
+	swift build -c release
 
 release-minor: check-toolchain bump-minor generate-build-info update-readme
 	swift build -c release
@@ -129,7 +132,13 @@ release:
 	@echo "  https://github.com/Arthur-Ficial/apfel/actions/workflows/publish-release.yml"
 	@echo ""
 	@echo "After it completes (~3 min), verify:"
-	@echo "  brew update && brew upgrade apfel && brew test apfel && apfel --version"
+	@echo "  brew update && brew upgrade apfel && apfel --version"
+	@echo "  ./scripts/post-release-verify.sh"
+
+# --- Pre-release qualification ---
+
+preflight:
+	@scripts/release-preflight.sh
 
 # --- Utilities ---
 

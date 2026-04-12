@@ -39,6 +39,8 @@ brew install apfel
 brew upgrade apfel
 ```
 
+Latest release immediately via tap: `brew install Arthur-Ficial/tap/apfel` (homebrew-core autobump can lag up to 24h).
+
 **Build from source:**
 
 ```bash
